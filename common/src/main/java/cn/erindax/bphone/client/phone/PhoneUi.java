@@ -1,6 +1,7 @@
 package cn.erindax.bphone.client.phone;
 
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.network.chat.Component;
@@ -371,6 +372,11 @@ final class PhoneUi {
 
     static void renderField(GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect bounds, String value,
                             Component placeholder, int border, int fill) {
+        renderField(guiGraphics, layout, bounds, value, placeholder, border, fill, true);
+    }
+
+    static void renderField(GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect bounds, String value,
+                            Component placeholder, int border, int fill, boolean caret) {
         fillRounded(guiGraphics, bounds.left, bounds.top, bounds.width, bounds.height, layout.radius, border);
         fillRounded(guiGraphics, bounds.left + 1, bounds.top + 1, bounds.width - 2, bounds.height - 2,
                 Math.max(1, layout.radius - 1), fill);
@@ -389,7 +395,7 @@ final class PhoneUi {
             drawText(guiGraphics, layout, text, textLeft, y, TEXT, layout.bodyScale);
             caretX = textLeft + layout.width(text, layout.bodyScale);
         }
-        if ((Util.getMillis() / 500L) % 2L == 0L) {
+        if (caret && (Util.getMillis() / 500L) % 2L == 0L) {
             guiGraphics.fill(caretX, y - 1, caretX + 1, y + layout.bodyHeight + 1, ACCENT);
         }
     }
@@ -536,12 +542,32 @@ final class PhoneUi {
             guiGraphics.fill(x, y, x + width, y + height, color);
             return;
         }
-        guiGraphics.fill(x, y + r, x + width, y + height - r, color);
-        for (int row = 0; row < r; row++) {
-            int inset = cornerInset(r, row);
-            guiGraphics.fill(x + inset, y + row, x + width - inset, y + row + 1, color);
-            guiGraphics.fill(x + inset, y + height - 1 - row, x + width - inset, y + height - row, color);
-        }
+        int density = pixelDensity();
+        int left = x * density;
+        int top = y * density;
+        int right = (x + width) * density;
+        int bottom = (y + height) * density;
+        int pr = r * density;
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        guiGraphics.drawManaged(() -> {
+            guiGraphics.fill(left, top + pr, right, bottom - pr, color);
+            for (int row = 0; row < pr; row++) {
+                int inset = roundInset(pr, row);
+                guiGraphics.fill(left + inset, top + row, right - inset, top + row + 1, color);
+                guiGraphics.fill(left + inset, bottom - 1 - row, right - inset, bottom - row, color);
+            }
+        });
+        guiGraphics.pose().popPose();
+    }
+
+    private static int roundInset(int radius, int row) {
+        double offset = radius - row - 0.5;
+        return radius - (int) Math.round(Math.sqrt(Math.max(0.0, (double) radius * radius - offset * offset)));
+    }
+
+    static int pixelDensity() {
+        return Math.max(1, (int) Math.round(Minecraft.getInstance().getWindow().getGuiScale()));
     }
 
     static int cornerInset(int radius, int row) {

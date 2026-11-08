@@ -1,507 +1,441 @@
 package cn.erindax.bphone.client.phone;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 
 import java.text.NumberFormat;
 import java.util.Locale;
+import java.util.Random;
+
+import static cn.erindax.bphone.client.phone.PhoneUi.*;
 
 final class PhoneBankSurfaceRenderer {
     private static final NumberFormat NUMBER_FORMAT = NumberFormat.getIntegerInstance(Locale.ROOT);
-    private static final int PAGE_FILL = 0xFFF0F4F8;
-    private static final int HEADER_FILL = 0xFF1E3A8A;
-    private static final int HEADER_GRADIENT = 0xFF3B82F6;
-    private static final int CARD_FILL = 0xFFFFFFFF;
-    private static final int CARD_SHADOW = 0x20000000;
-    private static final int CARD_EDGE = 0xFFE5E7EB;
-    private static final int FIELD_FILL = 0xFFFAFAFA;
-    private static final int FIELD_EDGE = 0xFFD1D5DB;
-    private static final int BUTTON_FILL = 0xFF3B82F6;
-    private static final int BUTTON_EDGE = 0xFF1E40AF;
-    private static final int BUTTON_SECONDARY_FILL = 0xFF9CA3AF;
-    private static final int BUTTON_SECONDARY_EDGE = 0xFF4B5563;
-    private static final int BUTTON_DISABLED = 0xFFD1D5DB;
-    private static final int BUTTON_GRADIENT_TOP = 0x30FFFFFF;
-    private static final int FOOTER_FILL = 0xFF374151;
-    private static final int TEXT_DARK = 0xFF111827;
-    private static final int TEXT_MUTED = 0xFF6B7280;
-    private static final int TEXT_LIGHT = 0xFFFFFFFF;
-    private static final int BALANCE_HIGHLIGHT = 0xFF10B981;
-    private static final int OVERLAY_FILL = 0xB8141A22;
+    private static final int SCAN_SHADE = 0xB8141A22;
+    private static final int SCAN_SUCCESS = 0xFF06C755;
+    private static final int CARD_TEXT_SOFT = 0xCCFFFFFF;
+    private static final int QR_DARK = 0xFF1A1F26;
 
     private PhoneBankSurfaceRenderer() {
     }
 
     static void renderBankSurface(PhoneScreen screen, GuiGraphics guiGraphics) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null) {
-            return;
-        }
-
-        Font font = minecraft.font;
-        UiRect contentBounds = screen.getBankSurfaceBounds();
-        int horizontalBleed = getHorizontalBleed(screen);
-        guiGraphics.fill(contentBounds.left - horizontalBleed, contentBounds.top,
-                contentBounds.right() + horizontalBleed, contentBounds.bottom(), PAGE_FILL);
-        drawHeader(screen, guiGraphics, font);
+        PhoneBankLayout layout = new PhoneBankLayout(screen);
+        UiRect surface = layout.ui.surface;
+        guiGraphics.fill(surface.left, surface.top, surface.right(), surface.bottom(), PAGE);
+        renderHeader(screen, guiGraphics, layout.ui, layout.header, title(screen), true, false);
 
         switch (screen.bankPage) {
-            case PhoneScreen.BANK_PAGE_TRANSFER -> renderTransferPage(screen, guiGraphics, font);
-            case PhoneScreen.BANK_PAGE_PAYMENT -> renderPaymentPage(screen, guiGraphics, font);
-            case PhoneScreen.BANK_PAGE_RECEIVE -> renderReceivePage(screen, guiGraphics, font);
-            case PhoneScreen.BANK_PAGE_SLIP -> renderSlipPage(screen, guiGraphics, font);
-            default -> renderHomePage(screen, guiGraphics, font);
+            case PhoneScreen.BANK_PAGE_TRANSFER -> renderForm(screen, guiGraphics, layout, false);
+            case PhoneScreen.BANK_PAGE_PAYMENT -> renderForm(screen, guiGraphics, layout, true);
+            case PhoneScreen.BANK_PAGE_RECEIVE -> renderReceivePage(screen, guiGraphics, layout);
+            case PhoneScreen.BANK_PAGE_SLIP -> renderSlipPage(screen, guiGraphics, layout);
+            default -> renderHomePage(screen, guiGraphics, layout);
         }
     }
 
     static void renderBankCameraOverlay(PhoneScreen screen, GuiGraphics guiGraphics) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null) {
-            return;
-        }
+        PhoneBankLayout layout = new PhoneBankLayout(screen);
+        PhoneChatLayout ui = layout.ui;
+        UiRect camera = screen.getCameraViewBounds();
+        int headerHeight = layout.scanHeaderHeight(camera);
+        int footerTop = layout.scanFooterTop(camera);
+        int bleed = Math.max(4, ui.u(6));
+        guiGraphics.fill(camera.left - bleed, camera.top, camera.right() + bleed, camera.top + headerHeight, SCAN_SHADE);
+        guiGraphics.fill(camera.left - bleed, footerTop, camera.right() + bleed, camera.bottom(), SCAN_SHADE);
 
-        Font font = minecraft.font;
-        UiRect cameraBounds = screen.getCameraViewBounds();
-        UiRect receiveBounds = screen.getBankScanReceiveButtonBounds();
-        UiRect eyeBounds = screen.getBankScanEyeButtonBounds();
-        int headerHeight = Math.max(42, Math.round(cameraBounds.height * 0.16F));
-        int footerHeight = Math.max(58, Math.round(cameraBounds.height * 0.24F));
-        int footerTop = cameraBounds.bottom() - footerHeight;
-        int horizontalBleed = getHorizontalBleed(screen);
-        int overlayLeft = cameraBounds.left - horizontalBleed;
-        int overlayRight = cameraBounds.right() + horizontalBleed;
-        guiGraphics.fill(overlayLeft, cameraBounds.top,
-                overlayRight, cameraBounds.top + headerHeight, OVERLAY_FILL);
-        guiGraphics.fill(overlayLeft, footerTop,
-                overlayRight, cameraBounds.bottom(), OVERLAY_FILL);
+        int centerX = camera.left + camera.width / 2;
+        int textWidth = camera.width - 2 * ui.pad;
+        int titleY = camera.top + (headerHeight - ui.titleHeight - ui.u(5)) / 2;
+        Component title = fit(ui, Component.translatable("screen.bphone.phone.bank.scan_title").getString(), BOLD,
+                textWidth, ui.titleScale);
+        drawCentered(guiGraphics, ui, title, centerX, titleY, WHITE, ui.titleScale);
+        int underlineWidth = Math.max(ui.u(16), ui.width(title, ui.titleScale) / 2);
+        int underlineY = titleY + ui.titleHeight + ui.u(3);
+        guiGraphics.fill(centerX - underlineWidth / 2, underlineY,
+                centerX - underlineWidth / 2 + underlineWidth, underlineY + Math.max(1, ui.u(1.5F)), ACCENT);
 
-        drawCentered(guiGraphics, font, Component.translatable("screen.bphone.phone.bank.scan_title"),
-                cameraBounds.left,
-                cameraBounds.top + Math.round(headerHeight * 0.33F),
-                cameraBounds.width, TEXT_LIGHT, 0.48F);
-        int underlineWidth = Math.max(42, Math.round(cameraBounds.width * 0.23F));
-        int underlineX = cameraBounds.left + (cameraBounds.width - underlineWidth) / 2;
-        int underlineY = cameraBounds.top + Math.round(headerHeight * 0.64F);
-        guiGraphics.fill(underlineX, underlineY, underlineX + underlineWidth,
-                underlineY + Math.max(1, Math.round(1 * screen.scale)), 0xCCFFFFFF);
-        drawCentered(guiGraphics, font, Component.translatable("screen.bphone.phone.bank.scan_hint"),
-                cameraBounds.left,
-                footerTop + Math.max(8, Math.round(10 * screen.scale)),
-                cameraBounds.width, TEXT_LIGHT, 0.32F);
+        drawWrappedCentered(guiGraphics, ui, Component.translatable("screen.bphone.phone.bank.scan_hint"),
+                centerX, footerTop + ui.u(8), textWidth, WHITE, ui.captionScale);
 
-        drawScanFrame(guiGraphics, cameraBounds, headerHeight, footerHeight, screen.scale);
-        drawButton(guiGraphics, font, receiveBounds, Component.translatable("screen.bphone.phone.bank.receive_qr"),
-                true, screen.scale);
-        drawEyeButton(guiGraphics, font, eyeBounds, screen.scale);
-    }
-
-    private static void renderHomePage(PhoneScreen screen, GuiGraphics guiGraphics, Font font) {
-        drawFooter(screen, guiGraphics);
-        drawAccountCard(screen, guiGraphics, font, screen.getBankAccountBounds());
-
-        UiRect balanceBounds = screen.getBankBalanceBounds();
-        drawCard(guiGraphics, balanceBounds);
-        drawLabelValue(guiGraphics, font, balanceBounds,
-                Component.translatable("screen.bphone.phone.bank.balance"),
-                Component.literal(NUMBER_FORMAT.format(screen.bankBalance)),
-                screen.scale, 0.48F, 0.72F);
-
-        drawButton(guiGraphics, font, screen.getBankHomeTransferButtonBounds(),
-                Component.translatable("screen.bphone.phone.bank.transfer"), true, screen.scale);
-        drawSecondaryButton(guiGraphics, font, screen.getBankHomeScanButtonBounds(),
-                Component.translatable("screen.bphone.phone.bank.scan"), true, screen.scale);
-        drawStatus(screen, guiGraphics, font, screen.getBankHomeScanButtonBounds().bottom());
-    }
-
-    private static void renderTransferPage(PhoneScreen screen, GuiGraphics guiGraphics, Font font) {
-        drawFooter(screen, guiGraphics);
-        drawField(guiGraphics, font, screen.getBankTransferNumberBounds(),
-                Component.translatable("screen.bphone.phone.bank.target"),
-                screen.bankTransferNumber.isBlank()
-                        ? Component.empty()
-                        : Component.literal(screen.bankTransferNumber),
-                screen.scale);
-        drawField(guiGraphics, font, screen.getBankTransferAmountBounds(),
-                Component.translatable("screen.bphone.phone.bank.amount"),
-                amountText(screen), screen.scale);
-        drawButton(guiGraphics, font, screen.getBankTransferButtonBounds(),
-                Component.translatable("screen.bphone.phone.bank.confirm"),
-                screen.canSendBankTransfer(), screen.scale);
-        drawSecondaryButton(guiGraphics, font, screen.getBankCancelButtonBounds(),
-                Component.translatable("screen.bphone.phone.bank.cancel"), true, screen.scale);
-        drawStatus(screen, guiGraphics, font, screen.getBankCancelButtonBounds().bottom());
-    }
-
-    private static void renderPaymentPage(PhoneScreen screen, GuiGraphics guiGraphics, Font font) {
-        drawFooter(screen, guiGraphics);
-        UiRect balanceBounds = screen.getBankPaymentBalanceBounds();
-        drawCard(guiGraphics, balanceBounds);
-        drawLabelValue(guiGraphics, font, balanceBounds,
-                Component.translatable("screen.bphone.phone.bank.balance"),
-                Component.literal(NUMBER_FORMAT.format(screen.bankBalance)),
-                screen.scale, 0.42F, 0.58F);
-
-        UiRect targetBounds = screen.getBankPaymentTargetBounds();
-        drawCard(guiGraphics, targetBounds);
-        String target = screen.bankPaymentName == null || screen.bankPaymentName.isBlank()
-                ? screen.bankTransferNumber
-                : screen.bankPaymentName + " (" + screen.bankTransferNumber + ")";
-        drawLabelValue(guiGraphics, font, targetBounds,
-                Component.translatable("screen.bphone.phone.bank.pay_to"),
-                Component.literal(target), screen.scale, 0.42F, 0.50F);
-
-        drawField(guiGraphics, font, screen.getBankTransferAmountBounds(),
-                Component.translatable("screen.bphone.phone.bank.amount"),
-                amountText(screen), screen.scale);
-        drawButton(guiGraphics, font, screen.getBankTransferButtonBounds(),
-                Component.translatable("screen.bphone.phone.bank.confirm"),
-                screen.canSendBankTransfer(), screen.scale);
-        drawSecondaryButton(guiGraphics, font, screen.getBankCancelButtonBounds(),
-                Component.translatable("screen.bphone.phone.bank.cancel"), true, screen.scale);
-        drawStatus(screen, guiGraphics, font, screen.getBankCancelButtonBounds().bottom());
-    }
-
-    private static void renderReceivePage(PhoneScreen screen, GuiGraphics guiGraphics, Font font) {
-        drawFooter(screen, guiGraphics);
-        UiRect cardBounds = screen.getBankReceiveCardBounds();
-        drawCard(guiGraphics, cardBounds);
-
-        drawCentered(guiGraphics, font, Component.translatable("screen.bphone.phone.bank.receive_title"),
-                cardBounds.left, cardBounds.top + Math.max(7, Math.round(8 * screen.scale)),
-                cardBounds.width, TEXT_DARK, 0.34F);
-
-        UiRect qrBounds = screen.getBankReceiveQrBounds();
-        drawQr(guiGraphics, qrBounds);
-        int numberTop = qrBounds.bottom() + Math.max(5, Math.round(6 * screen.scale));
-        drawCentered(guiGraphics, font, Component.literal(screen.getOwnPhoneNumber()),
-                cardBounds.left, numberTop, cardBounds.width, TEXT_DARK, 0.38F);
-        int numberBottom = numberTop + PhoneScreenDraw.scaledTextHeight(font, 0.38F);
-        int hintTop = Math.max(numberBottom + Math.max(8, Math.round(10 * screen.scale)),
-                cardBounds.bottom() - Math.max(15, Math.round(18 * screen.scale)));
-        drawCentered(guiGraphics, font, Component.translatable("screen.bphone.phone.bank.receive_hint"),
-                cardBounds.left, hintTop, cardBounds.width, TEXT_MUTED, 0.26F,
-                cardBounds.width - Math.max(10, Math.round(12 * screen.scale)));
-
-        drawSecondaryButton(guiGraphics, font, screen.getBankCancelButtonBounds(),
-                Component.translatable("screen.bphone.phone.bank.cancel"), true, screen.scale);
-        drawEyeButton(guiGraphics, font, screen.getBankReceiveEyeButtonBounds(), screen.scale);
-    }
-
-    private static void renderSlipPage(PhoneScreen screen, GuiGraphics guiGraphics, Font font) {
-        drawFooter(screen, guiGraphics);
-        UiRect cardBounds = screen.getBankSlipCardBounds();
-        drawCard(guiGraphics, cardBounds);
-
-        drawCentered(guiGraphics, font, Component.translatable("screen.bphone.phone.bank.slip_title"),
-                cardBounds.left, cardBounds.top + Math.max(6, Math.round(7 * screen.scale)),
-                cardBounds.width, BALANCE_HIGHLIGHT, 0.42F);
-
-        String to = screen.bankSlipTargetName == null || screen.bankSlipTargetName.isBlank()
-                ? screen.bankSlipTargetNumber
-                : screen.bankSlipTargetName + " (" + screen.bankSlipTargetNumber + ")";
-        int rowX = cardBounds.left + Math.max(8, Math.round(10 * screen.scale));
-        int rowY = cardBounds.top + Math.max(27, Math.round(31 * screen.scale));
-        int rowWidth = cardBounds.width - Math.max(16, Math.round(20 * screen.scale));
-        rowY = drawSlipRow(guiGraphics, font, rowX, rowY, rowWidth,
-                Component.translatable("screen.bphone.phone.bank.slip_from"),
-                Component.literal(screen.getOwnPhoneNumber()), screen.scale);
-        rowY = drawSlipRow(guiGraphics, font, rowX, rowY, rowWidth,
-                Component.translatable("screen.bphone.phone.bank.slip_to"),
-                Component.literal(to), screen.scale);
-        rowY = drawSlipRow(guiGraphics, font, rowX, rowY, rowWidth,
-                Component.translatable("screen.bphone.phone.bank.amount"),
-                Component.literal(NUMBER_FORMAT.format(screen.bankSlipAmount)), screen.scale);
-        rowY = drawSlipRow(guiGraphics, font, rowX, rowY, rowWidth,
-                Component.translatable("screen.bphone.phone.bank.slip_time"),
-                Component.literal(screen.bankSlipTime), screen.scale);
-        drawSlipRow(guiGraphics, font, rowX, rowY, rowWidth,
-                Component.translatable("screen.bphone.phone.bank.slip_balance"),
-                Component.literal(NUMBER_FORMAT.format(screen.bankSlipBalance)), screen.scale);
-
-        drawSecondaryButton(guiGraphics, font, screen.getBankCancelButtonBounds(),
-                Component.translatable("screen.bphone.phone.bank.done"), true, screen.scale);
-    }
-
-    private static void drawHeader(PhoneScreen screen, GuiGraphics guiGraphics, Font font) {
-        UiRect headerBounds = screen.getBankHeaderBounds();
-        int horizontalBleed = getHorizontalBleed(screen);
-        int headerLeft = headerBounds.left - horizontalBleed;
-        int headerRight = headerBounds.right() + horizontalBleed;
-        guiGraphics.fill(headerLeft, headerBounds.top, headerRight, headerBounds.bottom(), HEADER_FILL);
-        int gradientHeight = Math.max(1, headerBounds.height / 2);
-        guiGraphics.fillGradient(headerLeft, headerBounds.top,
-                headerRight, headerBounds.top + gradientHeight,
-                HEADER_GRADIENT, HEADER_FILL);
-        drawCentered(guiGraphics, font, Component.translatable("screen.bphone.phone.bank.title"),
-                headerBounds.left,
-                headerBounds.top + (headerBounds.height - PhoneScreenDraw.scaledTextHeight(font, 0.55F)) / 2,
-                headerBounds.width, TEXT_LIGHT, 0.55F);
-    }
-
-    private static void drawFooter(PhoneScreen screen, GuiGraphics guiGraphics) {
-        UiRect contentBounds = screen.getBankSurfaceBounds();
-        int footerHeight = Math.max(58, Math.round(contentBounds.height * 0.24F));
-        int horizontalBleed = getHorizontalBleed(screen);
-        guiGraphics.fill(contentBounds.left - horizontalBleed, contentBounds.bottom() - footerHeight,
-                contentBounds.right() + horizontalBleed, contentBounds.bottom(), FOOTER_FILL);
-    }
-
-    private static int getHorizontalBleed(PhoneScreen screen) {
-        return Math.max(4, Math.round(6 * screen.scale));
-    }
-
-    private static void drawScanFrame(GuiGraphics guiGraphics, UiRect cameraBounds,
-                                      int headerHeight, int footerHeight, float scale) {
-        int availableTop = cameraBounds.top + headerHeight + Math.max(18, Math.round(22 * scale));
-        int availableBottom = cameraBounds.bottom() - footerHeight - Math.max(12, Math.round(14 * scale));
-        int availableHeight = Math.max(24, availableBottom - availableTop);
-        int size = Math.min(cameraBounds.width - Math.max(28, Math.round(34 * scale)),
-                Math.min(availableHeight, Math.max(70, Math.round(92 * scale))));
-        int left = cameraBounds.left + (cameraBounds.width - size) / 2;
+        UiRect receive = layout.scanReceive(camera);
+        int availableTop = camera.top + headerHeight + ui.u(14);
+        int availableBottom = footerTop - ui.u(14);
+        int availableHeight = Math.max(ui.u(24), availableBottom - availableTop);
+        int size = Math.min(camera.width - ui.u(34), Math.min(availableHeight, ui.u(92)));
+        int left = camera.left + (camera.width - size) / 2;
         int top = availableTop + Math.max(0, (availableHeight - size) / 2);
         int right = left + size;
         int bottom = top + size;
-        int cornerLength = Math.max(12, Math.round(17 * scale));
-        int thickness = Math.max(2, Math.round(2 * scale));
+        int cornerLength = Math.max(8, ui.u(16));
+        int thickness = Math.max(1, ui.u(2));
         int shadow = 0x66000000;
-        int color = 0xEFFFFFFF;
-
+        int color = screen.bankScanHoverTicks > 0 ? SCAN_SUCCESS : 0xEFFFFFFF;
         drawCorner(guiGraphics, left + 1, top + 1, cornerLength, thickness, true, true, shadow);
-        drawCorner(guiGraphics, right - 1, top + 1, cornerLength, thickness, false, true, shadow);
-        drawCorner(guiGraphics, left + 1, bottom - 1, cornerLength, thickness, true, false, shadow);
-        drawCorner(guiGraphics, right - 1, bottom - 1, cornerLength, thickness, false, false, shadow);
+        drawCorner(guiGraphics, right + 1, top + 1, cornerLength, thickness, false, true, shadow);
+        drawCorner(guiGraphics, left + 1, bottom + 1, cornerLength, thickness, true, false, shadow);
+        drawCorner(guiGraphics, right + 1, bottom + 1, cornerLength, thickness, false, false, shadow);
         drawCorner(guiGraphics, left, top, cornerLength, thickness, true, true, color);
         drawCorner(guiGraphics, right, top, cornerLength, thickness, false, true, color);
         drawCorner(guiGraphics, left, bottom, cornerLength, thickness, true, false, color);
         drawCorner(guiGraphics, right, bottom, cornerLength, thickness, false, false, color);
+        if (screen.bankScanHoverTicks > 0) {
+            float progress = Mth.clamp(screen.bankScanHoverTicks / (float) PhoneScreen.BANK_SCAN_HOLD_TICKS, 0.0F, 1.0F);
+            int fillHeight = Math.round((size - 2 * thickness) * progress);
+            guiGraphics.fill(left + thickness, bottom - thickness - fillHeight,
+                    right - thickness, bottom - thickness, 0x3306C755);
+        }
+
+        renderButton(screen, guiGraphics, ui, receive, Component.translatable("screen.bphone.phone.bank.receive_qr"),
+                Tone.PRIMARY);
+        UiRect eye = layout.scanEye(camera);
+        fillRounded(guiGraphics, eye.left, eye.top, eye.width, eye.height, ui.radius,
+                hovered(screen, eye) ? 0xB3000000 : 0x80000000);
+        drawEye(guiGraphics, eye, WHITE, QR_DARK);
     }
 
-    private static void drawCorner(GuiGraphics guiGraphics, int x, int y, int length,
-                                   int thickness, boolean leftSide, boolean topSide, int color) {
-        int horizontalX1 = leftSide ? x : x - length;
-        int horizontalY1 = topSide ? y : y - thickness;
-        guiGraphics.fill(horizontalX1, horizontalY1, horizontalX1 + length, horizontalY1 + thickness, color);
-
-        int verticalX1 = leftSide ? x : x - thickness;
-        int verticalY1 = topSide ? y : y - length;
-        guiGraphics.fill(verticalX1, verticalY1, verticalX1 + thickness, verticalY1 + length, color);
+    private static Component title(PhoneScreen screen) {
+        return Component.translatable(switch (screen.bankPage) {
+            case PhoneScreen.BANK_PAGE_TRANSFER -> "screen.bphone.phone.bank.transfer";
+            case PhoneScreen.BANK_PAGE_PAYMENT -> "screen.bphone.phone.bank.scan_title";
+            case PhoneScreen.BANK_PAGE_RECEIVE -> "screen.bphone.phone.bank.receive_qr";
+            case PhoneScreen.BANK_PAGE_SLIP -> "screen.bphone.phone.bank.slip_title";
+            default -> "screen.bphone.phone.bank.title";
+        });
     }
 
-    private static void drawCard(GuiGraphics guiGraphics, UiRect bounds) {
-        int shadowOffset = 2;
-        guiGraphics.fill(bounds.left + shadowOffset, bounds.top + shadowOffset,
-                bounds.right() + shadowOffset, bounds.bottom() + shadowOffset, CARD_SHADOW);
-        guiGraphics.fill(bounds.left, bounds.top, bounds.right(), bounds.bottom(), CARD_EDGE);
-        guiGraphics.fill(bounds.left + 1, bounds.top + 1, bounds.right() - 1, bounds.bottom() - 1, CARD_FILL);
-        guiGraphics.fill(bounds.left + 1, bounds.top + 1, bounds.right() - 1, bounds.top + 2, 0x10FFFFFF);
-    }
+    private static void renderHomePage(PhoneScreen screen, GuiGraphics guiGraphics, PhoneBankLayout layout) {
+        PhoneChatLayout ui = layout.ui;
+        UiRect card = layout.card();
+        fillRounded(guiGraphics, card.left, card.top, card.width, card.height, 2 * ui.radius, ACCENT);
+        int inner = ui.u(10);
+        int textLeft = card.left + inner;
+        int textWidth = card.width - 2 * inner;
+        int y = card.top + inner;
 
-    private static void drawAccountCard(PhoneScreen screen, GuiGraphics guiGraphics, Font font, UiRect bounds) {
-        drawCard(guiGraphics, bounds);
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null || minecraft.player == null || minecraft.getConnection() == null) {
+        UiRect face = new UiRect(textLeft, y, ui.avatarSmall, ui.avatarSmall);
+        renderFace(guiGraphics, ownSkin(minecraft), face, ACCENT);
+        String name = minecraft.player == null ? "" : minecraft.player.getName().getString();
+        int nameLeft = face.right() + ui.gap;
+        drawText(guiGraphics, ui, fit(ui, name, BOLD, card.right() - inner - nameLeft, ui.bodyScale),
+                nameLeft, y + (ui.avatarSmall - ui.bodyHeight) / 2, WHITE, ui.bodyScale);
+
+        y = face.bottom() + ui.u(8);
+        drawText(guiGraphics, ui, fit(ui, Component.translatable("screen.bphone.phone.bank.balance").getString(), PLAIN,
+                textWidth, ui.captionScale), textLeft, y, CARD_TEXT_SOFT, ui.captionScale);
+        y += ui.captionHeight + ui.textGap;
+        drawAmount(guiGraphics, layout, NUMBER_FORMAT.format(screen.bankBalance), textLeft, y, textWidth, false, WHITE);
+        y += layout.heroHeight + ui.u(6);
+        String account = Component.translatable("screen.bphone.phone.bank.account").getString() + "  "
+                + screen.getOwnPhoneNumber();
+        drawText(guiGraphics, ui, fit(ui, account, PLAIN, textWidth, ui.captionScale), textLeft, y, CARD_TEXT_SOFT,
+                ui.captionScale);
+
+        renderTile(screen, guiGraphics, layout, 0, "screen.bphone.phone.bank.transfer");
+        renderTile(screen, guiGraphics, layout, 1, "screen.bphone.phone.bank.scan");
+        renderTile(screen, guiGraphics, layout, 2, "screen.bphone.phone.bank.receive_title");
+        renderStatus(screen, guiGraphics, ui, layout.homeStatusTop());
+    }
+
+    private static void renderTile(PhoneScreen screen, GuiGraphics guiGraphics, PhoneBankLayout layout, int index,
+                                   String key) {
+        PhoneChatLayout ui = layout.ui;
+        UiRect tile = layout.tile(index);
+        fillRounded(guiGraphics, tile.left, tile.top, tile.width, tile.height, 2 * ui.radius,
+                hovered(screen, tile) ? HOVER : SURFACE);
+        int icon = layout.tileIcon();
+        int x = tile.left + (tile.width - icon) / 2;
+        int y = tile.top + ui.u(10);
+        int thickness = Math.max(1, Math.round(icon / 9.0F));
+        switch (index) {
+            case 0 -> drawTransferGlyph(guiGraphics, x, y, icon, thickness);
+            case 1 -> drawScanGlyph(guiGraphics, x, y, icon, thickness);
+            default -> drawQrGlyph(guiGraphics, x, y, icon);
+        }
+        Component label = fit(ui, Component.translatable(key).getString(), PLAIN, tile.width - 2 * ui.u(3), ui.bodyScale);
+        drawCentered(guiGraphics, ui, label, tile.left + tile.width / 2, y + icon + ui.u(6), TEXT, ui.bodyScale);
+    }
+
+    private static void renderForm(PhoneScreen screen, GuiGraphics guiGraphics, PhoneBankLayout layout, boolean payment) {
+        PhoneChatLayout ui = layout.ui;
+        int labelLeft = layout.left + ui.u(2);
+        if (payment) {
+            UiRect payee = layout.payee();
+            fillRounded(guiGraphics, payee.left, payee.top, payee.width, payee.height, 2 * ui.radius, SURFACE);
+            String name = screen.bankPaymentName == null || screen.bankPaymentName.isBlank()
+                    ? screen.bankTransferNumber
+                    : screen.bankPaymentName;
+            renderGroupAvatar(guiGraphics, ui, ui.rowAvatar(payee, ui.avatar), name);
+            String detail = Component.translatable("screen.bphone.phone.bank.pay_to").getString() + "  "
+                    + screen.bankTransferNumber;
+            renderTwoLineText(guiGraphics, ui, payee, ui.rowTextLeft(payee, ui.avatar), payee.right() - ui.pad,
+                    name, TEXT, detail, TEXT_SECONDARY);
+        } else {
+            drawText(guiGraphics, ui, Component.translatable("screen.bphone.phone.bank.target"), labelLeft,
+                    layout.numberLabelTop(), TEXT_SECONDARY, ui.captionScale);
+            boolean numberFocused = !screen.bankAmountFocused;
+            renderField(guiGraphics, ui, layout.numberField(), screen.bankTransferNumber,
+                    Component.translatable("screen.bphone.phone.bank.number_placeholder"),
+                    numberFocused ? ACCENT : HAIRLINE, SURFACE, numberFocused);
+        }
+
+        drawText(guiGraphics, ui, Component.translatable("screen.bphone.phone.bank.amount"), labelLeft,
+                layout.amountLabelTop(), TEXT_SECONDARY, ui.captionScale);
+        boolean amountFocused = payment || screen.bankAmountFocused;
+        String amount = screen.bankTransferAmount.isBlank() ? "" : NUMBER_FORMAT.format(screen.getBankTransferAmount());
+        renderField(guiGraphics, ui, layout.amountField(), amount,
+                Component.literal("0"), amountFocused ? ACCENT : HAIRLINE, SURFACE, amountFocused);
+        String available = Component.translatable("screen.bphone.phone.bank.balance").getString() + "  "
+                + NUMBER_FORMAT.format(screen.bankBalance);
+        drawText(guiGraphics, ui, fit(ui, available, PLAIN, layout.width, ui.captionScale), labelLeft,
+                layout.availableTop(), TEXT_TERTIARY, ui.captionScale);
+
+        renderOutlineButton(screen, guiGraphics, ui, layout.cancel(),
+                Component.translatable("screen.bphone.phone.bank.cancel"));
+        renderButton(screen, guiGraphics, ui, layout.confirm(), Component.translatable("screen.bphone.phone.bank.confirm"),
+                screen.canSendBankTransfer() ? Tone.PRIMARY : Tone.DISABLED);
+        renderStatus(screen, guiGraphics, ui, layout.formStatusTop());
+    }
+
+    private static void renderReceivePage(PhoneScreen screen, GuiGraphics guiGraphics, PhoneBankLayout layout) {
+        PhoneChatLayout ui = layout.ui;
+        UiRect card = layout.receiveCard();
+        fillRounded(guiGraphics, card.left, card.top, card.width, card.height, 2 * ui.radius, SURFACE);
+        int centerX = card.left + card.width / 2;
+        int textWidth = card.width - 2 * ui.pad;
+        Component title = fit(ui, Component.translatable("screen.bphone.phone.bank.receive_title").getString(), BOLD,
+                textWidth, ui.bodyScale);
+        drawCentered(guiGraphics, ui, title, centerX, card.top + ui.u(10), TEXT, ui.bodyScale);
+
+        UiRect qr = layout.receiveQr();
+        drawQr(guiGraphics, qr, screen.getOwnPhoneNumber());
+        int y = qr.bottom() + ui.u(8);
+        drawCentered(guiGraphics, ui, fit(ui, screen.getOwnPhoneNumber(), BOLD, textWidth, ui.titleScale), centerX, y,
+                TEXT, ui.titleScale);
+        y += ui.titleHeight + ui.u(6);
+        drawWrappedCentered(guiGraphics, ui, Component.translatable("screen.bphone.phone.bank.receive_hint"), centerX, y,
+                textWidth, TEXT_SECONDARY, ui.captionScale);
+
+        renderOutlineButton(screen, guiGraphics, ui, layout.cancel(),
+                Component.translatable("screen.bphone.phone.bank.cancel"));
+        UiRect eye = layout.receiveEye();
+        renderButton(screen, guiGraphics, ui, eye, Component.empty(), Tone.PRIMARY);
+        drawEye(guiGraphics, eye, WHITE, ACCENT);
+    }
+
+    private static void renderSlipPage(PhoneScreen screen, GuiGraphics guiGraphics, PhoneBankLayout layout) {
+        PhoneChatLayout ui = layout.ui;
+        UiRect card = layout.slipCard();
+        fillRounded(guiGraphics, card.left, card.top, card.width, card.height, 2 * ui.radius, SURFACE);
+        int centerX = card.left + card.width / 2;
+        int textWidth = card.width - 2 * ui.pad;
+        int check = layout.slipCheck();
+        int y = card.top + ui.u(12);
+        fillRounded(guiGraphics, centerX - check / 2, y, check, check, check / 2, SUCCESS);
+        drawCheckMark(guiGraphics, centerX - check / 2, y, check);
+        y += check + ui.u(8);
+        Component done = fit(ui, Component.translatable("screen.bphone.phone.bank.status.transfer_done").getString(),
+                BOLD, textWidth, ui.bodyScale);
+        drawCentered(guiGraphics, ui, done, centerX, y, TEXT, ui.bodyScale);
+        y += ui.bodyHeight + ui.u(6);
+        drawAmount(guiGraphics, layout, NUMBER_FORMAT.format(screen.bankSlipAmount), card.left + ui.pad, y, textWidth,
+                true, TEXT);
+        y += layout.heroHeight + ui.u(10);
+        guiGraphics.fill(card.left + ui.pad, y, card.right() - ui.pad, y + 1, HAIRLINE);
+        y += ui.u(8);
+
+        String to = screen.bankSlipTargetName == null || screen.bankSlipTargetName.isBlank()
+                ? screen.bankSlipTargetNumber
+                : screen.bankSlipTargetName + " (" + screen.bankSlipTargetNumber + ")";
+        y = renderSlipRow(guiGraphics, ui, card, y, "screen.bphone.phone.bank.slip_from", screen.getOwnPhoneNumber());
+        y = renderSlipRow(guiGraphics, ui, card, y, "screen.bphone.phone.bank.slip_to", to);
+        y = renderSlipRow(guiGraphics, ui, card, y, "screen.bphone.phone.bank.slip_time", screen.bankSlipTime);
+        renderSlipRow(guiGraphics, ui, card, y, "screen.bphone.phone.bank.slip_balance",
+                NUMBER_FORMAT.format(screen.bankSlipBalance));
+
+        renderButton(screen, guiGraphics, ui, layout.cancel(), Component.translatable("screen.bphone.phone.bank.done"),
+                Tone.PRIMARY);
+    }
+
+    private static int renderSlipRow(GuiGraphics guiGraphics, PhoneChatLayout ui, UiRect card, int y, String key,
+                                     String value) {
+        int left = card.left + ui.pad;
+        int right = card.right() - ui.pad;
+        Component label = Component.translatable(key);
+        int labelWidth = ui.width(label, ui.captionScale);
+        drawText(guiGraphics, ui, label, left, y + (ui.bodyHeight - ui.captionHeight) / 2, TEXT_SECONDARY,
+                ui.captionScale);
+        Component fitted = fit(ui, value, PLAIN, right - left - labelWidth - ui.gap, ui.bodyScale);
+        drawText(guiGraphics, ui, fitted, right - ui.width(fitted, ui.bodyScale), y, TEXT, ui.bodyScale);
+        return y + ui.bodyHeight + ui.u(8);
+    }
+
+    private static void renderStatus(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout ui, int top) {
+        if (screen.bankStatus == null || screen.bankStatus.getString().isBlank()) {
             return;
         }
-
-        int padding = Math.max(4, Math.round(5 * screen.scale));
-        int headSize = Math.max(20, Math.round(24 * screen.scale));
-        int headX = bounds.left + padding;
-        int headY = bounds.top + (bounds.height - headSize) / 2;
-        guiGraphics.fill(headX, headY, headX + headSize, headY + headSize, 0xFFE5E7EB);
-
-        try {
-            var playerInfo = minecraft.getConnection().getPlayerInfo(minecraft.player.getUUID());
-            if (playerInfo != null) {
-                var skinLocation = playerInfo.getSkin().texture();
-                guiGraphics.blit(skinLocation, headX, headY, headSize, headSize,
-                        8.0F, 8.0F, 8, 8, 64, 64);
-                guiGraphics.blit(skinLocation, headX, headY, headSize, headSize,
-                        40.0F, 8.0F, 8, 8, 64, 64);
-            }
-        } catch (Exception ignored) {
-            guiGraphics.fill(headX + 1, headY + 1, headX + headSize - 1, headY + headSize - 1, 0xFF9CA3AF);
-        }
-
-        int textX = headX + headSize + padding;
-        int textWidth = bounds.right() - textX - padding;
-        int textY = headY + Math.max(0, Math.round(1 * screen.scale));
-        Component playerName = minecraft.player.getName();
-        float nameScale = fitTextScale(font, playerName, textWidth, 0.58F);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, playerName, textX, textY, TEXT_DARK, false, nameScale);
-
-        int labelY = textY + PhoneScreenDraw.scaledTextHeight(font, nameScale) + Math.max(1, Math.round(1 * screen.scale));
-        Component accountLabel = Component.translatable("screen.bphone.phone.bank.account");
-        float labelScale = fitTextScale(font, accountLabel, textWidth, 0.42F);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, accountLabel, textX, labelY, TEXT_MUTED, false, labelScale);
-
-        int numberY = labelY + PhoneScreenDraw.scaledTextHeight(font, labelScale) + Math.max(1, Math.round(1 * screen.scale));
-        Component accountNumber = Component.literal(screen.getOwnPhoneNumber());
-        float numberScale = fitTextScale(font, accountNumber, textWidth, 0.52F);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, accountNumber, textX, numberY, TEXT_DARK, false, numberScale);
+        drawWrappedCentered(guiGraphics, ui, screen.bankStatus, ui.surface.left + ui.surface.width / 2, top,
+                ui.surface.width - 4 * ui.pad, TEXT_SECONDARY, ui.captionScale);
     }
 
-    private static void drawButton(GuiGraphics guiGraphics, Font font, UiRect bounds,
-                                   Component label, boolean enabled, float scale) {
-        drawButton(guiGraphics, font, bounds, label, enabled, scale, BUTTON_FILL, BUTTON_EDGE);
+    private static void renderOutlineButton(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout ui,
+                                            UiRect bounds, Component label) {
+        fillRounded(guiGraphics, bounds.left, bounds.top, bounds.width, bounds.height, ui.radius, HAIRLINE);
+        fillRounded(guiGraphics, bounds.left + 1, bounds.top + 1, bounds.width - 2, bounds.height - 2,
+                Math.max(1, ui.radius - 1), hovered(screen, bounds) ? HOVER : SURFACE);
+        Component fitted = fit(ui, label.getString(), PLAIN, bounds.width - 2 * ui.u(3), ui.bodyScale);
+        drawCentered(guiGraphics, ui, fitted, bounds.left + bounds.width / 2,
+                bounds.top + (bounds.height - ui.bodyHeight) / 2, TEXT, ui.bodyScale);
     }
 
-    private static void drawSecondaryButton(GuiGraphics guiGraphics, Font font, UiRect bounds,
-                                            Component label, boolean enabled, float scale) {
-        drawButton(guiGraphics, font, bounds, label, enabled, scale, BUTTON_SECONDARY_FILL, BUTTON_SECONDARY_EDGE);
+    private static void drawAmount(GuiGraphics guiGraphics, PhoneBankLayout layout, String amount, int left, int top,
+                                   int width, boolean centered, int color) {
+        PhoneChatLayout ui = layout.ui;
+        Component text = Component.literal(amount).withStyle(BOLD);
+        float scale = ui.width(text, layout.heroScale) <= width ? layout.heroScale : ui.titleScale;
+        Component fitted = fit(ui, amount, BOLD, width, scale);
+        int y = top + layout.heroHeight - Math.max(1, Math.round(8.0F * scale));
+        int x = centered ? left + (width - ui.width(fitted, scale)) / 2 : left;
+        drawText(guiGraphics, ui, fitted, x, y, color, scale);
     }
 
-    private static void drawEyeButton(GuiGraphics guiGraphics, Font font, UiRect bounds, float scale) {
-        drawButton(guiGraphics, font, bounds, Component.empty(), true, scale);
+    private static ResourceLocation ownSkin(Minecraft minecraft) {
+        return minecraft.player == null ? DefaultPlayerSkin.getDefaultTexture() : minecraft.player.getSkin().texture();
+    }
+
+    private static void drawTransferGlyph(GuiGraphics guiGraphics, int x, int y, int size, int thickness) {
+        int left = x + size / 6;
+        int right = x + size - size / 6 - thickness;
+        int upper = y + size * 3 / 8 - thickness / 2;
+        int lower = y + size * 5 / 8 - thickness / 2;
+        int head = Math.max(2, size / 5);
+        drawLine(guiGraphics, left, upper, right, upper, thickness, ACCENT);
+        drawLine(guiGraphics, right - head, upper - head, right, upper, thickness, ACCENT);
+        drawLine(guiGraphics, left, lower, right, lower, thickness, ACCENT);
+        drawLine(guiGraphics, left, lower, left + head, lower + head, thickness, ACCENT);
+    }
+
+    private static void drawScanGlyph(GuiGraphics guiGraphics, int x, int y, int size, int thickness) {
+        int length = Math.max(2, size * 3 / 10);
+        drawCorner(guiGraphics, x, y, length, thickness, true, true, ACCENT);
+        drawCorner(guiGraphics, x + size, y, length, thickness, false, true, ACCENT);
+        drawCorner(guiGraphics, x, y + size, length, thickness, true, false, ACCENT);
+        drawCorner(guiGraphics, x + size, y + size, length, thickness, false, false, ACCENT);
+        int lineTop = y + (size - thickness) / 2;
+        guiGraphics.fill(x + 2 * thickness, lineTop, x + size - 2 * thickness, lineTop + thickness, ACCENT);
+    }
+
+    private static void drawQrGlyph(GuiGraphics guiGraphics, int x, int y, int size) {
+        int finder = Math.max(3, size * 3 / 8);
+        int ring = Math.max(1, finder / 6);
+        drawFinder(guiGraphics, x, y, finder, ring, ACCENT);
+        drawFinder(guiGraphics, x + size - finder, y, finder, ring, ACCENT);
+        drawFinder(guiGraphics, x, y + size - finder, finder, ring, ACCENT);
+        int dot = Math.max(1, (size - finder) / 4);
+        int dotLeft = x + size - finder;
+        int dotTop = y + size - finder;
+        guiGraphics.fill(dotLeft, dotTop, dotLeft + dot, dotTop + dot, ACCENT);
+        guiGraphics.fill(x + size - dot, dotTop, x + size, dotTop + dot, ACCENT);
+        guiGraphics.fill(dotLeft + (finder - dot) / 2, dotTop + (finder - dot) / 2,
+                dotLeft + (finder + dot) / 2, dotTop + (finder + dot) / 2, ACCENT);
+        guiGraphics.fill(dotLeft, y + size - dot, dotLeft + dot, y + size, ACCENT);
+        guiGraphics.fill(x + size - dot, y + size - dot, x + size, y + size, ACCENT);
+    }
+
+    private static void drawFinder(GuiGraphics guiGraphics, int x, int y, int size, int thickness, int color) {
+        guiGraphics.fill(x, y, x + size, y + thickness, color);
+        guiGraphics.fill(x, y + size - thickness, x + size, y + size, color);
+        guiGraphics.fill(x, y + thickness, x + thickness, y + size - thickness, color);
+        guiGraphics.fill(x + size - thickness, y + thickness, x + size, y + size - thickness, color);
+        int inner = Math.max(1, size - 4 * thickness);
+        int offset = (size - inner) / 2;
+        guiGraphics.fill(x + offset, y + offset, x + offset + inner, y + offset + inner, color);
+    }
+
+    private static void drawCheckMark(GuiGraphics guiGraphics, int x, int y, int size) {
+        int thickness = Math.max(1, size / 8);
+        int x0 = x + size * 27 / 100;
+        int y0 = y + size / 2;
+        int xm = x + size * 43 / 100;
+        int ym = y + size * 65 / 100;
+        int x1 = x + size * 72 / 100;
+        int y1 = y + size * 34 / 100;
+        drawLine(guiGraphics, x0, y0, xm, ym, thickness, WHITE);
+        drawLine(guiGraphics, xm, ym, x1, y1, thickness, WHITE);
+    }
+
+    private static void drawEye(GuiGraphics guiGraphics, UiRect bounds, int color, int pupilColor) {
         int size = Math.min(bounds.width, bounds.height);
-        int eyeWidth = Math.max(7, Math.round(size * 0.62F));
+        int eyeWidth = Math.max(7, Math.round(size * 0.56F));
         int eyeHeight = Math.max(5, Math.round(eyeWidth * 0.56F));
         int left = bounds.left + (bounds.width - eyeWidth) / 2;
         int top = bounds.top + (bounds.height - eyeHeight) / 2;
         for (int row = 0; row < eyeHeight; row++) {
             float offset = Math.abs((row + 0.5F) / eyeHeight * 2.0F - 1.0F);
             int inset = Math.round(eyeWidth / 2.0F * (1.0F - (float) Math.sqrt(1.0F - offset)));
-            guiGraphics.fill(left + inset, top + row, left + eyeWidth - inset, top + row + 1, TEXT_LIGHT);
+            guiGraphics.fill(left + inset, top + row, left + eyeWidth - inset, top + row + 1, color);
         }
-
-        int pupilHeight = Math.max(1, Math.round(eyeHeight * 0.6F));
-        if ((eyeHeight - pupilHeight) % 2 != 0) {
-            pupilHeight++;
+        int pupil = Math.max(2, Math.round(eyeHeight * 0.6F));
+        if ((eyeHeight - pupil) % 2 != 0) {
+            pupil++;
         }
-        int pupilWidth = pupilHeight;
-        if ((eyeWidth - pupilWidth) % 2 != 0) {
-            pupilWidth--;
-        }
+        int pupilWidth = (eyeWidth - pupil) % 2 != 0 ? pupil - 1 : pupil;
         pupilWidth = Math.max(2, pupilWidth);
         int pupilLeft = left + (eyeWidth - pupilWidth) / 2;
-        int pupilTop = top + (eyeHeight - pupilHeight) / 2;
-        guiGraphics.fill(pupilLeft, pupilTop, pupilLeft + pupilWidth, pupilTop + pupilHeight, BUTTON_EDGE);
+        int pupilTop = top + (eyeHeight - pupil) / 2;
+        guiGraphics.fill(pupilLeft, pupilTop, pupilLeft + pupilWidth, pupilTop + pupil, pupilColor);
     }
 
-    private static void drawButton(GuiGraphics guiGraphics, Font font, UiRect bounds,
-                                   Component label, boolean enabled, float scale, int enabledFill, int enabledEdge) {
-        int fill = enabled ? enabledFill : BUTTON_DISABLED;
-        int edge = enabled ? enabledEdge : CARD_EDGE;
-        if (enabled) {
-            int shadowOffset = 2;
-            guiGraphics.fill(bounds.left + shadowOffset, bounds.top + shadowOffset,
-                    bounds.right() + shadowOffset, bounds.bottom() + shadowOffset, 0x30000000);
-        }
-
-        guiGraphics.fill(bounds.left, bounds.top, bounds.right(), bounds.bottom(), edge);
-        guiGraphics.fill(bounds.left + 1, bounds.top + 1, bounds.right() - 1, bounds.bottom() - 1, fill);
-        if (enabled) {
-            int highlightHeight = Math.max(2, Math.round(4 * scale));
-            guiGraphics.fillGradient(bounds.left + 2, bounds.top + 2,
-                    bounds.right() - 2, bounds.top + highlightHeight,
-                    BUTTON_GRADIENT_TOP, 0x00FFFFFF);
-        }
-
-        drawCentered(guiGraphics, font, label, bounds.left,
-                bounds.top + (bounds.height - PhoneScreenDraw.scaledTextHeight(font, 0.40F)) / 2,
-                bounds.width, TEXT_LIGHT, 0.40F);
-    }
-
-    private static void drawField(GuiGraphics guiGraphics, Font font, UiRect bounds,
-                                  Component label, Component value, float scale) {
-        int labelWidth = Math.max(1, bounds.width - 6);
-        float labelScale = fitTextScale(font, label, labelWidth, 0.42F);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, label,
-                bounds.left + 1, bounds.top, TEXT_MUTED, false, labelScale);
-
-        int labelHeight = PhoneScreenDraw.scaledTextHeight(font, labelScale);
-        int fieldTop = bounds.top + labelHeight + Math.max(2, Math.round(3 * scale));
-        guiGraphics.fill(bounds.left, fieldTop, bounds.right(), bounds.bottom(), FIELD_EDGE);
-        guiGraphics.fill(bounds.left + 1, fieldTop + 1, bounds.right() - 1, bounds.bottom() - 1, FIELD_FILL);
-        guiGraphics.fill(bounds.left + 1, fieldTop + 1, bounds.right() - 1, fieldTop + 2, 0x10000000);
-
-        int valueTop = fieldTop + Math.max(5, Math.round(6 * scale));
-        float valueScale = fitTextScale(font, value, labelWidth, 0.60F);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, value,
-                bounds.left + 3, valueTop, TEXT_DARK, false, valueScale);
-    }
-
-    private static void drawLabelValue(GuiGraphics guiGraphics, Font font, UiRect bounds,
-                                       Component label, Component value, float scale,
-                                       float labelMaxScale, float valueMaxScale) {
-        int textWidth = Math.max(1, bounds.width - Math.max(10, Math.round(12 * scale)));
-        int textX = bounds.left + Math.max(5, Math.round(6 * scale));
-        int labelY = bounds.top + Math.max(5, Math.round(6 * scale));
-        float labelScale = fitTextScale(font, label, textWidth, labelMaxScale);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, label, textX, labelY, TEXT_MUTED, false, labelScale);
-
-        int valueY = labelY + PhoneScreenDraw.scaledTextHeight(font, labelScale) + Math.max(3, Math.round(4 * scale));
-        float valueScale = fitTextScale(font, value, textWidth, valueMaxScale);
-        int valueColor = label.getString().toLowerCase(Locale.ROOT).contains("balance") ? BALANCE_HIGHLIGHT : TEXT_DARK;
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, value, textX, valueY, valueColor, false, valueScale);
-    }
-
-    private static int drawSlipRow(GuiGraphics guiGraphics, Font font, int x, int y, int width,
-                                   Component label, Component value, float scale) {
-        float labelScale = fitTextScale(font, label, width, 0.38F);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, label, x, y, TEXT_MUTED, false, labelScale);
-        int valueY = y + PhoneScreenDraw.scaledTextHeight(font, labelScale) + Math.max(1, Math.round(2 * scale));
-        float valueScale = fitTextScale(font, value, width, 0.46F);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, value, x, valueY, TEXT_DARK, false, valueScale);
-        return valueY + PhoneScreenDraw.scaledTextHeight(font, valueScale) + Math.max(5, Math.round(6 * scale));
-    }
-
-    private static void drawStatus(PhoneScreen screen, GuiGraphics guiGraphics, Font font, int afterY) {
-        UiRect contentBounds = screen.getBankSurfaceBounds();
-        Component statusText = screen.bankStatus == null || screen.bankStatus.getString().isBlank()
-                ? Component.translatable("screen.bphone.phone.bank.status.ready")
-                : screen.bankStatus;
-        int maxWidth = contentBounds.width - Math.max(12, Math.round(14 * screen.scale));
-        int textHeight = PhoneScreenDraw.scaledTextHeight(font, 0.36F);
-        int top = Math.min(contentBounds.bottom() - textHeight - Math.max(24, Math.round(28 * screen.scale)),
-                afterY + Math.max(5, Math.round(6 * screen.scale)));
-        drawCentered(guiGraphics, font, statusText, contentBounds.left, top,
-                contentBounds.width, TEXT_MUTED, 0.36F, maxWidth);
-    }
-
-    private static Component amountText(PhoneScreen screen) {
-        return screen.bankTransferAmount.isBlank()
-                ? Component.empty()
-                : Component.literal(NUMBER_FORMAT.format(screen.getBankTransferAmount()));
-    }
-
-    private static void drawCentered(GuiGraphics guiGraphics, Font font, Component text, int left, int top,
-                                     int width, int color, float maxScale) {
-        drawCentered(guiGraphics, font, text, left, top, width, color, maxScale, width - 6);
-    }
-
-    private static void drawCentered(GuiGraphics guiGraphics, Font font, Component text, int left, int top,
-                                     int width, int color, float maxScale, int maxTextWidth) {
-        float textScale = fitTextScale(font, text, Math.max(1, maxTextWidth), maxScale);
-        int textWidth = PhoneScreenDraw.scaledTextWidth(font, text, textScale);
-        PhoneScreenDraw.drawScaledText(guiGraphics, font, text,
-                left + (width - textWidth) / 2, top, color, false, textScale);
-    }
-
-    private static float fitTextScale(Font font, Component text, int maxWidth, float preferredScale) {
-        int textWidth = Math.max(1, font.width(text));
-        float fittedScale = (float) maxWidth / textWidth;
-        return Math.max(0.22F, Math.min(preferredScale, fittedScale));
-    }
-
-    private static void drawQr(GuiGraphics guiGraphics, UiRect bounds) {
-        guiGraphics.fill(bounds.left, bounds.top, bounds.right(), bounds.bottom(), 0xFFFFFFFF);
-        guiGraphics.fill(bounds.left, bounds.top, bounds.right(), bounds.bottom(), 0xFF1A1F26);
-        guiGraphics.fill(bounds.left + 2, bounds.top + 2, bounds.right() - 2, bounds.bottom() - 2, 0xFFFFFFFF);
-        int cells = 9;
-        int cell = Math.max(1, (bounds.width - 8) / cells);
-        int startX = bounds.left + (bounds.width - (cell * cells)) / 2;
-        int startY = bounds.top + (bounds.height - (cell * cells)) / 2;
-        for (int row = 0; row < cells; row++) {
-            for (int col = 0; col < cells; col++) {
-                boolean finder = (row < 3 && col < 3) || (row < 3 && col > 5) || (row > 5 && col < 3);
-                boolean fill = finder || ((row * 7 + col * 5 + row * col) % 4 == 0);
-                if (fill) {
-                    guiGraphics.fill(startX + col * cell, startY + row * cell,
-                            startX + (col + 1) * cell - 1, startY + (row + 1) * cell - 1, 0xFF1A1F26);
+    private static void drawQr(GuiGraphics guiGraphics, UiRect plate, String seed) {
+        int density = pixelDensity();
+        int platePixels = plate.width * density;
+        int module = Math.max(1, platePixels / PhoneBankLayout.QR_CELLS);
+        fillRounded(guiGraphics, plate.left, plate.top, plate.width, plate.height, Math.max(1, module / density), WHITE);
+        int codeSize = module * PhoneBankLayout.QR_MODULES;
+        int originX = plate.left * density + (platePixels - codeSize) / 2;
+        int originY = plate.top * density + (plate.height * density - codeSize) / 2;
+        Random random = new Random(seed == null ? 0L : seed.hashCode());
+        int last = PhoneBankLayout.QR_MODULES - 1;
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        guiGraphics.drawManaged(() -> {
+            for (int row = 0; row < PhoneBankLayout.QR_MODULES; row++) {
+                for (int col = 0; col < PhoneBankLayout.QR_MODULES; col++) {
+                    boolean dark;
+                    int finderRow = row < 8 ? row : row > last - 8 ? row - (last - 6) : -1;
+                    int finderCol = col < 8 ? col : col > last - 8 ? col - (last - 6) : -1;
+                    boolean inFinderZone = finderRow >= -1 && finderCol >= -1
+                            && (row < 8 || row > last - 8) && (col < 8 || col > last - 8)
+                            && !(row > last - 8 && col > last - 8);
+                    if (inFinderZone) {
+                        dark = finderModule(row < 8 ? row : finderRow, col < 8 ? col : finderCol);
+                    } else if (row == 6 || col == 6) {
+                        dark = (row + col) % 2 == 0;
+                    } else {
+                        dark = random.nextInt(100) < 47;
+                    }
+                    if (dark) {
+                        int x = originX + col * module;
+                        int y = originY + row * module;
+                        guiGraphics.fill(x, y, x + module, y + module, QR_DARK);
+                    }
                 }
             }
+        });
+        guiGraphics.pose().popPose();
+    }
+
+    private static boolean finderModule(int row, int col) {
+        if (row < 0 || col < 0 || row > 6 || col > 6) {
+            return false;
         }
+        boolean ring = row == 0 || row == 6 || col == 0 || col == 6;
+        boolean core = row >= 2 && row <= 4 && col >= 2 && col <= 4;
+        return ring || core;
     }
 }

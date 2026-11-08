@@ -157,7 +157,7 @@ public final class PhoneScreen extends Screen {
     private static final float CAMERA_SELFIE_MAX_ZOOM_FACTOR = 3.0F;
     private static final int CAMERA_ZOOM_INDICATOR_TICKS = 30;
     private static final double CAMERA_LOOK_TURN_SCALE = 3.0D;
-    private static final int BANK_SCAN_HOLD_TICKS = 28;
+    static final int BANK_SCAN_HOLD_TICKS = 28;
     static final int BANK_PAGE_HOME = 0;
     static final int BANK_PAGE_TRANSFER = 1;
     static final int BANK_PAGE_SCAN = 2;
@@ -220,10 +220,11 @@ public final class PhoneScreen extends Screen {
     long bankSlipAmount;
     long bankSlipBalance;
     int bankPage = BANK_PAGE_HOME;
+    boolean bankAmountFocused;
     private boolean bankReceiveActive;
     private boolean closingForBankReceiveWorld;
     private UUID bankScanHoverTargetId;
-    private int bankScanHoverTicks;
+    int bankScanHoverTicks;
     private int bankScanRequestCooldown;
     boolean activeCallIncoming;
     boolean activeCallConnected;
@@ -1079,6 +1080,30 @@ public final class PhoneScreen extends Screen {
         }
 
         if (button == 0 && bankAppMode) {
+            if (getBankBackButtonBounds().contains(mouseX, mouseY)) {
+                if (bankPage == BANK_PAGE_HOME) {
+                    closeBankApp();
+                } else {
+                    openBankHomePage();
+                }
+                return true;
+            }
+
+            if (bankPage == BANK_PAGE_HOME && getBankHomeReceiveButtonBounds().contains(mouseX, mouseY)) {
+                openBankReceivePage();
+                return true;
+            }
+
+            if (bankPage == BANK_PAGE_TRANSFER && getBankTransferNumberBounds().contains(mouseX, mouseY)) {
+                bankAmountFocused = false;
+                return true;
+            }
+
+            if (bankPage == BANK_PAGE_TRANSFER && getBankTransferAmountBounds().contains(mouseX, mouseY)) {
+                bankAmountFocused = true;
+                return true;
+            }
+
             if (bankPage == BANK_PAGE_HOME && getBankHomeTransferButtonBounds().contains(mouseX, mouseY)) {
                 openBankTransferPage();
                 return true;
@@ -1435,22 +1460,22 @@ public final class PhoneScreen extends Screen {
                 }
 
                 Font font = minecraft.font;
-                int labelWidth = Math.max(this.width + Math.round(18 * scale), Math.round(46 * scale));
-                float labelScale = Math.min(0.46F, (float) labelWidth / Math.max(1, font.width(label)));
+                PhoneChatLayout layout = new PhoneChatLayout(PhoneScreen.this);
+                int paddingX = Math.max(2, Math.round(3 * scale));
+                int paddingY = Math.max(1, Math.round(2 * scale));
+                int labelWidth = Math.max(this.width + Math.round(18 * scale), Math.round(46 * scale)) - 2 * paddingX;
+                float labelScale = Math.min(layout.captionScale, (float) labelWidth / Math.max(1, font.width(label)));
                 int labelTextWidth = PhoneScreenDraw.scaledTextWidth(font, label, labelScale);
                 int labelX = this.getX() + (this.width - labelTextWidth) / 2;
                 int labelY = this.getY() + this.height + Math.max(2, Math.round(3 * scale));
                 int labelHeight = PhoneScreenDraw.scaledTextHeight(font, labelScale);
-                int paddingX = Math.max(2, Math.round(3 * scale));
-                int paddingY = Math.max(1, Math.round(2 * scale));
-                guiGraphics.fill(labelX - paddingX, labelY - paddingY,
-                        labelX + labelTextWidth + paddingX, labelY + labelHeight + paddingY,
-                        0x80000000);
+                int pillHeight = labelHeight + 2 * paddingY;
+                PhoneUi.fillRounded(guiGraphics, labelX - paddingX, labelY - paddingY,
+                        labelTextWidth + 2 * paddingX, pillHeight, pillHeight / 2, 0x80000000);
                 PhoneScreenDraw.drawScaledText(guiGraphics, font, label, labelX, labelY, 0xFFFFFFFF, false, labelScale);
 
                 int badge = badgeCount.getAsInt();
                 if (badge > 0) {
-                    PhoneChatLayout layout = new PhoneChatLayout(PhoneScreen.this);
                     PhoneUi.renderBadge(guiGraphics, layout, this.getX() + this.width - layout.u(7),
                             this.getY() + layout.u(2), badge);
                 }
@@ -1896,203 +1921,48 @@ public final class PhoneScreen extends Screen {
         return getLayoutState().callSpeakerButtonBounds();
     }
 
-    UiRect getBankSurfaceBounds() {
-        return new UiRect(displayX, displayY, displayWidth, displayHeight);
-    }
-
-    UiRect getBankHeaderBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int height = Math.max(28, Math.round(32 * scale));
-        return new UiRect(contentBounds.left, contentBounds.top, contentBounds.width, height);
-    }
-
-    UiRect getBankAccountBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(5, Math.round(6 * scale));
-        int top = getBankHeaderBounds().bottom() + Math.max(5, Math.round(6 * scale));
-        int height = Math.max(32, Math.round(38 * scale));
-        return new UiRect(contentBounds.left + sidePadding, top, contentBounds.width - (sidePadding * 2), height);
-    }
-
-    UiRect getBankBalanceBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(5, Math.round(6 * scale));
-        int top = getBankAccountBounds().bottom() + Math.max(5, Math.round(6 * scale));
-        int height = Math.max(36, Math.round(43 * scale));
-        return new UiRect(contentBounds.left + sidePadding, top, contentBounds.width - (sidePadding * 2), height);
+    UiRect getBankBackButtonBounds() {
+        return new PhoneBankLayout(this).back();
     }
 
     UiRect getBankHomeTransferButtonBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int footerHeight = Math.max(58, Math.round(contentBounds.height * 0.24F));
-        int sidePadding = Math.max(8, Math.round(10 * scale));
-        int buttonGap = Math.max(5, Math.round(6 * scale));
-        int height = Math.max(17, Math.round(19 * scale));
-        int top = contentBounds.bottom() - footerHeight + Math.max(9, Math.round(10 * scale));
-        int width = (contentBounds.width - (sidePadding * 2) - buttonGap) / 2;
-        return new UiRect(contentBounds.left + sidePadding, top, width, height);
+        return new PhoneBankLayout(this).tile(0);
     }
 
     UiRect getBankHomeScanButtonBounds() {
-        UiRect transferBounds = getBankHomeTransferButtonBounds();
-        int buttonGap = Math.max(5, Math.round(6 * scale));
-        return new UiRect(transferBounds.right() + buttonGap, transferBounds.top,
-                transferBounds.width, transferBounds.height);
+        return new PhoneBankLayout(this).tile(1);
     }
 
-    UiRect getBankPaymentTargetBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(5, Math.round(6 * scale));
-        int top = getBankPaymentBalanceBounds().bottom() + Math.max(5, Math.round(6 * scale));
-        int height = Math.max(32, Math.round(38 * scale));
-        return new UiRect(contentBounds.left + sidePadding, top, contentBounds.width - (sidePadding * 2), height);
-    }
-
-    UiRect getBankPaymentBalanceBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(5, Math.round(6 * scale));
-        int top = getBankHeaderBounds().bottom() + Math.max(6, Math.round(7 * scale));
-        int height = Math.max(24, Math.round(28 * scale));
-        return new UiRect(contentBounds.left + sidePadding, top, contentBounds.width - (sidePadding * 2), height);
+    UiRect getBankHomeReceiveButtonBounds() {
+        return new PhoneBankLayout(this).tile(2);
     }
 
     UiRect getBankTransferNumberBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(5, Math.round(6 * scale));
-        int top = getBankHeaderBounds().bottom() + Math.max(8, Math.round(9 * scale));
-        int height = Math.max(24, Math.round(28 * scale));
-        return new UiRect(contentBounds.left + sidePadding, top, contentBounds.width - (sidePadding * 2), height);
+        return new PhoneBankLayout(this).numberField();
     }
 
     UiRect getBankTransferAmountBounds() {
-        UiRect previousBounds = bankPage == BANK_PAGE_PAYMENT ? getBankPaymentTargetBounds() : getBankTransferNumberBounds();
-        int top = previousBounds.bottom() + Math.max(5, Math.round(6 * scale));
-        return new UiRect(previousBounds.left, top, previousBounds.width, previousBounds.height);
+        return new PhoneBankLayout(this).amountField();
     }
 
     UiRect getBankTransferButtonBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(5, Math.round(6 * scale));
-        int top = getBankTransferAmountBounds().bottom() + Math.max(7, Math.round(8 * scale));
-        int height = Math.max(18, Math.round(21 * scale));
-        if (bankPage == BANK_PAGE_PAYMENT || bankPage == BANK_PAGE_TRANSFER) {
-            int buttonGap = Math.max(4, Math.round(5 * scale));
-            int width = (contentBounds.width - (sidePadding * 2) - buttonGap) / 2;
-            return new UiRect(contentBounds.left + sidePadding + width + buttonGap, top, width, height);
-        }
-        return new UiRect(contentBounds.left + sidePadding, top, contentBounds.width - (sidePadding * 2), height);
+        return new PhoneBankLayout(this).confirm();
     }
 
     UiRect getBankCancelButtonBounds() {
-        UiRect transferBounds = getBankTransferButtonBounds();
-        if (bankPage == BANK_PAGE_PAYMENT || bankPage == BANK_PAGE_TRANSFER) {
-            UiRect contentBounds = getBankSurfaceBounds();
-            int sidePadding = Math.max(5, Math.round(6 * scale));
-            return new UiRect(contentBounds.left + sidePadding, transferBounds.top,
-                    transferBounds.width, transferBounds.height);
-        }
-
-        if (bankPage == BANK_PAGE_RECEIVE || bankPage == BANK_PAGE_SLIP) {
-            UiRect contentBounds = getBankSurfaceBounds();
-            int sidePadding = Math.max(8, Math.round(10 * scale));
-            int bottomInset = Math.max(24, Math.round(28 * scale));
-            int buttonHeight = bankPage == BANK_PAGE_RECEIVE
-                    ? Math.max(20, Math.round(24 * scale))
-                    : Math.max(18, Math.round(21 * scale));
-            int top = contentBounds.bottom() - bottomInset - buttonHeight;
-            
-            if (bankPage == BANK_PAGE_SLIP) {
-                int buttonWidth = Math.min(contentBounds.width - (sidePadding * 2),
-                        Math.max(68, Math.round(84 * scale)));
-                return new UiRect(contentBounds.left + (contentBounds.width - buttonWidth) / 2,
-                        top, buttonWidth, buttonHeight);
-            }
-
-            int buttonGap = Math.max(6, Math.round(8 * scale));
-            int eyeButtonSize = buttonHeight;
-            int eyeButtonX = contentBounds.right() - sidePadding - eyeButtonSize;
-            
-            int cancelButtonWidth = eyeButtonX - contentBounds.left - sidePadding - buttonGap;
-            return new UiRect(contentBounds.left + sidePadding, top, cancelButtonWidth, buttonHeight);
-        }
-        int top = transferBounds.bottom() + Math.max(5, Math.round(6 * scale));
-        return new UiRect(transferBounds.left, top, transferBounds.width, transferBounds.height);
+        return new PhoneBankLayout(this).cancel();
     }
 
     UiRect getBankReceiveEyeButtonBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(8, Math.round(10 * scale));
-        int bottomInset = Math.max(24, Math.round(28 * scale));
-        int buttonHeight = Math.max(20, Math.round(24 * scale));
-        int top = contentBounds.bottom() - bottomInset - buttonHeight;
-        
-        int eyeButtonSize = buttonHeight;
-        int eyeButtonX = contentBounds.right() - sidePadding - eyeButtonSize;
-        return new UiRect(eyeButtonX, top, eyeButtonSize, eyeButtonSize);
-    }
-
-    UiRect getBankReceiveCardBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(5, Math.round(6 * scale));
-        int top = getBankHeaderBounds().bottom() + Math.max(7, Math.round(8 * scale));
-        int bottom = getBankCancelButtonBounds().top - Math.max(6, Math.round(7 * scale));
-        return new UiRect(contentBounds.left + sidePadding, top, contentBounds.width - (sidePadding * 2),
-                Math.max(76, bottom - top));
-    }
-
-    UiRect getBankReceiveQrBounds() {
-        UiRect cardBounds = getBankReceiveCardBounds();
-        int maxByWidth = cardBounds.width - Math.max(22, Math.round(26 * scale));
-        int maxByHeight = Math.round(cardBounds.height * 0.46F);
-        int size = Math.min(Math.max(40, maxByWidth), Math.max(42, Math.min(maxByHeight, Math.round(52 * scale))));
-        return new UiRect(cardBounds.left + (cardBounds.width - size) / 2,
-                cardBounds.top + Math.max(20, Math.round(24 * scale)),
-                size,
-                size);
+        return new PhoneBankLayout(this).receiveEye();
     }
 
     UiRect getBankScanReceiveButtonBounds() {
-        UiRect cameraBounds = getCameraViewBounds();
-        int sidePadding = Math.max(8, Math.round(10 * scale));
-        int buttonGap = Math.max(6, Math.round(8 * scale));
-        int bottomInset = Math.max(24, Math.round(28 * scale));
-        int buttonHeight = Math.max(20, Math.round(24 * scale));
-        int buttonY = cameraBounds.bottom() - bottomInset - buttonHeight;
-        int eyeButtonSize = buttonHeight;
-        int eyeButtonX = cameraBounds.right() - sidePadding - eyeButtonSize;
-        int receiveButtonWidth = eyeButtonX - cameraBounds.left - sidePadding - buttonGap;
-        return new UiRect(cameraBounds.left + sidePadding, buttonY, receiveButtonWidth, buttonHeight);
+        return new PhoneBankLayout(this).scanReceive(getCameraViewBounds());
     }
 
     UiRect getBankScanEyeButtonBounds() {
-        UiRect cameraBounds = getCameraViewBounds();
-        int sidePadding = Math.max(8, Math.round(10 * scale));
-        int bottomInset = Math.max(24, Math.round(28 * scale));
-        int buttonHeight = Math.max(20, Math.round(24 * scale));
-        int buttonY = cameraBounds.bottom() - bottomInset - buttonHeight;
-        int eyeButtonSize = buttonHeight;
-        int eyeButtonX = cameraBounds.right() - sidePadding - eyeButtonSize;
-        return new UiRect(eyeButtonX, buttonY, eyeButtonSize, eyeButtonSize);
-    }
-
-    UiRect getBankReceiveButtonBounds() {
-        UiRect cameraBounds = getCameraViewBounds();
-        int width = Math.max(68, Math.round(82 * scale));
-        int height = Math.max(18, Math.round(21 * scale));
-        int bottomInset = Math.max(24, Math.round(28 * scale));
-        return new UiRect(cameraBounds.left + (cameraBounds.width - width) / 2,
-                cameraBounds.bottom() - bottomInset - height,
-                width,
-                height);
-    }
-
-    UiRect getBankSlipCardBounds() {
-        UiRect contentBounds = getBankSurfaceBounds();
-        int sidePadding = Math.max(5, Math.round(6 * scale));
-        int top = getBankHeaderBounds().bottom() + Math.max(7, Math.round(8 * scale));
-        int bottom = getBankCancelButtonBounds().top - Math.max(7, Math.round(8 * scale));
-        return new UiRect(contentBounds.left + sidePadding, top,
-                contentBounds.width - (sidePadding * 2), Math.max(104, bottom - top));
+        return new PhoneBankLayout(this).scanEye(getCameraViewBounds());
     }
 
     List<PhoneContact> getPhoneContacts() {
@@ -2628,6 +2498,7 @@ public final class PhoneScreen extends Screen {
         setBankReceiveActive(false);
         closeCamera();
         bankPage = BANK_PAGE_TRANSFER;
+        bankAmountFocused = false;
         bankAppMode = true;
         bankTransferNumber = "";
         bankTransferAmount = "";
@@ -2730,6 +2601,7 @@ public final class PhoneScreen extends Screen {
         closeCamera();
         bankAppMode = true;
         bankPage = BANK_PAGE_PAYMENT;
+        bankAmountFocused = true;
         bankTransferNumber = PhoneData.normalizePhoneNumber(targetNumber);
         bankTransferAmount = "";
         bankPaymentName = targetName == null ? "" : targetName;
@@ -2944,31 +2816,38 @@ public final class PhoneScreen extends Screen {
             return;
         }
 
-        if (bankPage == BANK_PAGE_PAYMENT) {
-            if (bankTransferAmount.length() < 9) {
-                bankTransferAmount = bankTransferAmount + digit;
+        if (bankPage == BANK_PAGE_TRANSFER && !bankAmountFocused) {
+            if (bankTransferNumber.length() < PhoneData.PHONE_NUMBER_LENGTH) {
+                bankTransferNumber = bankTransferNumber + digit;
+                bankAmountFocused = bankTransferNumber.length() >= PhoneData.PHONE_NUMBER_LENGTH;
+                return;
             }
-            return;
+            bankAmountFocused = true;
         }
 
-        if (bankPage == BANK_PAGE_TRANSFER && bankTransferNumber.length() < PhoneData.PHONE_NUMBER_LENGTH) {
-            bankTransferNumber = bankTransferNumber + digit;
-            return;
-        }
-
-        if (bankPage == BANK_PAGE_TRANSFER && bankTransferAmount.length() < 9) {
+        if ((bankPage == BANK_PAGE_TRANSFER || bankPage == BANK_PAGE_PAYMENT) && bankTransferAmount.length() < 9) {
             bankTransferAmount = bankTransferAmount + digit;
         }
     }
 
     private void removeLastBankDigit() {
+        if (bankPage == BANK_PAGE_TRANSFER && !bankAmountFocused) {
+            if (!bankTransferNumber.isEmpty()) {
+                bankTransferNumber = bankTransferNumber.substring(0, bankTransferNumber.length() - 1);
+            }
+            return;
+        }
+
         if (!bankTransferAmount.isEmpty()) {
             bankTransferAmount = bankTransferAmount.substring(0, bankTransferAmount.length() - 1);
             return;
         }
 
-        if (bankPage == BANK_PAGE_TRANSFER && !bankTransferNumber.isEmpty()) {
-            bankTransferNumber = bankTransferNumber.substring(0, bankTransferNumber.length() - 1);
+        if (bankPage == BANK_PAGE_TRANSFER) {
+            bankAmountFocused = false;
+            if (!bankTransferNumber.isEmpty()) {
+                bankTransferNumber = bankTransferNumber.substring(0, bankTransferNumber.length() - 1);
+            }
         }
     }
 

@@ -454,9 +454,34 @@ public final class DevUiSnapshots {
             call(screen, "openBankApp");
             call(screen, "openBankScanCamera");
         });
+        scene("55_bank_transfer", screen -> {
+            call(screen, "openBankApp");
+            call(screen, "openBankTransferPage");
+            screen.bankTransferNumber = "12345";
+            screen.bankTransferAmount = "2500";
+            screen.bankAmountFocused = true;
+        });
+        scene("56_bank_receive", screen -> {
+            call(screen, "openBankApp");
+            call(screen, "openBankReceivePage");
+        });
+        scene("57_bank_slip", screen -> {
+            call(screen, "openBankApp");
+            screen.handleBankTransferReceipt("12345", "Alex", 2500L, 97500L);
+        });
+        scene("58_bank_pay", screen -> {
+            call(screen, "openBankApp");
+            call(screen, "openBankPaymentPage", "12345", "Alex");
+        });
+        scene("59_bank_dark", screen -> {
+            screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE, "1");
+            call(screen, "openBankApp");
+            call(screen, "openBankReceivePage");
+        });
         world("52_qr_raise_fp", minecraft -> {
             PhoneScreen screen = new PhoneScreen(InteractionHand.MAIN_HAND);
             minecraft.setScreen(screen);
+            screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE, "0");
             screen.showChatQrToWorld();
         });
         world("53_qr_raise_tp", minecraft -> minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT));

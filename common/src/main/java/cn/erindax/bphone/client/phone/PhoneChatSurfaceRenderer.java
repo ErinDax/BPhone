@@ -1499,7 +1499,7 @@ final class PhoneChatSurfaceRenderer {
             int badge = index == PhoneChatLayout.TAB_CONTACTS ? requestCount
                     : index == PhoneChatLayout.TAB_CHATS ? unreadCount : 0;
             if (badge > 0) {
-                renderBadge(guiGraphics, layout, labelX + labelWidth, labelY, badge);
+                renderBadge(guiGraphics, layout, labelX + labelWidth + layout.u(1), labelY, badge);
             }
         }
     }

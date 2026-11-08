@@ -26,7 +26,7 @@ public abstract class HumanoidModelMixin<T extends LivingEntity> {
     private static final float CAMERA_ARM_ROLL = 0.08F;
     private static final float QR_ARM_X = 4.25F;
     private static final float QR_ARM_FORWARD_Z = -1.0F;
-    private static final float QR_ARM_PITCH = -1.15F;
+    private static final float QR_ARM_PITCH = -0.95F;
     private static final float QR_ARM_YAW = 0.22F;
     private static final float QR_ARM_ROLL = 0.08F;
     private static final float MEGAPHONE_ARM_SIDE_OFFSET = 2.15F;
@@ -94,7 +94,7 @@ public abstract class HumanoidModelMixin<T extends LivingEntity> {
             return;
         }
 
-        if (PhoneClientHooks.shouldUsePhoneQrModel(entity)) {
+        if (PhoneClientHooks.shouldUsePhoneQrModel(entity) || PhoneClientHooks.shouldUseChatQrModel(entity)) {
             raisedArm.x = -QR_ARM_X * side;
             raisedArm.z = QR_ARM_FORWARD_Z;
             raisedArm.xRot = Mth.clamp(head.xRot + QR_ARM_PITCH, -1.80F, 0.35F);
