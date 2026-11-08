@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    "bphone:phone",
+    "bphone:phone_black",
+    "bphone:phone_blue",
+    "bphone:phone_red",
+    "bphone:phone_yellow",
+    "bphone:phone_aqua",
+    "bphone:phone_lightgreen",
+    "bphone:megaphone"
+  ]
+}

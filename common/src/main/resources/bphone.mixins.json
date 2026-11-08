@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "package": "cn.erindax.bphone.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "client": [
+    "client.CameraMixin",
+    "client.GameRendererMixin",
+    "client.GuiMixin",
+    "client.HumanoidModelMixin",
+    "client.ItemInHandLayerMixin",
+    "client.ItemInHandRendererMixin",
+    "client.KeyboardInputMixin",
+    "client.LevelRendererMixin",
+    "client.LocalPlayerMixin"
+  ],
+  "mixins": [
+    "PlayerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

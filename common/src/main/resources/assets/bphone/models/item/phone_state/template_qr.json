@@ -1,0 +1,15 @@
+{
+  "parent": "bphone:item/phone_state/template",
+  "display": {
+    "thirdperson_righthand": {
+      "rotation": [16, 180, 0],
+      "translation": [-1.75, 2, 0],
+      "scale": [0.5, 0.5, 0.5]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [16, 180, 0],
+      "translation": [0, 3.75, 0],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

@@ -1,0 +1,51 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "PolyForm Noncommercial 1.0.0"
+
+[[mods]]
+modId = "bphone"
+version = "${version}"
+displayName = "BPhone"
+authors = "CatLab Design"
+displayURL = "https://dotpp.xyz"
+description = '''
+Mobile phones with chat, bank, shop, map and announcement apps, plus home phones, walkie radios, megaphones and airstrike radios.
+'''
+
+[[dependencies.bphone]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.bphone]]
+modId = "minecraft"
+type = "required"
+versionRange = "[${minecraft_version},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.bphone]]
+modId = "architectury"
+type = "required"
+versionRange = "[${architectury_api_version},)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.bphone]]
+modId = "plasmovoice"
+type = "optional"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.bphone]]
+modId = "voicechat"
+type = "optional"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[mixins]]
+config = "bphone.mixins.json"

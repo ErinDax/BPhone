@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "bphone",
+  "version": "${version}",
+  "name": "BPhone",
+  "description": "Mobile phones with chat, bank, shop, map and announcement apps, plus home phones, walkie radios, megaphones and airstrike radios.",
+  "authors": [
+    "CatLab Design"
+  ],
+  "contact": {
+    "homepage": "https://dotpp.xyz"
+  },
+  "license": "PolyForm Noncommercial 1.0.0",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "cn.erindax.bphone.fabric.BEATFabric"
+    ],
+    "client": [
+      "cn.erindax.bphone.fabric.client.BEATFabricClient"
+    ],
+    "voicechat": [
+      "cn.erindax.bphone.voice.svc.BEATSvcPlugin"
+    ]
+  },
+  "mixins": [
+    "bphone.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.2",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=${java_version}",
+    "architectury": ">=${architectury_api_version}",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "plasmovoice": "*",
+    "voicechat": "*"
+  }
+}

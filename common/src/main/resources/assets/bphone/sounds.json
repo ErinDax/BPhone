@@ -1,0 +1,75 @@
+{
+  "home_phone_ring": {
+    "category": "block",
+    "subtitle": "subtitles.bphone.home_phone_ring",
+    "sounds": [
+      {
+        "name": "bphone:block/phone/home_phone_ring",
+        "stream": true
+      }
+    ]
+  },
+  "phone_ring": {
+    "category": "player",
+    "subtitle": "subtitles.bphone.phone_ring",
+    "sounds": [
+      {
+        "name": "bphone:block/phone/phone_ring1"
+      }
+    ]
+  },
+  "phone_dialing": {
+    "category": "player",
+    "subtitle": "subtitles.bphone.phone_dialing",
+    "sounds": [
+      {
+        "name": "bphone:block/phone/dialing"
+      }
+    ]
+  },
+  "airstrike_target_locked_en_us": {
+    "category": "player",
+    "sounds": [
+      {
+        "name": "bphone:item/airstrike/target_locked_en_us",
+        "stream": true
+      }
+    ]
+  },
+  "airstrike_target_locked_th_th": {
+    "category": "player",
+    "sounds": [
+      {
+        "name": "bphone:item/airstrike/target_locked_th_th",
+        "stream": true
+      }
+    ]
+  },
+  "walkie_on_you": {
+    "category": "player",
+    "subtitle": "subtitles.bphone.walkie_on_you",
+    "sounds": [
+      {
+        "name": "bphone:item/walkie/radio_onyou"
+      }
+    ]
+  },
+  "walkie_close": {
+    "category": "player",
+    "subtitle": "subtitles.bphone.walkie_close",
+    "sounds": [
+      {
+        "name": "bphone:item/walkie/radio_close"
+      }
+    ]
+  },
+  "walkie_talk": {
+    "category": "player",
+    "subtitle": "subtitles.bphone.walkie_talk",
+    "sounds": [
+      {
+        "name": "bphone:item/walkie/radio_talk"
+      }
+    ]
+  }
+}

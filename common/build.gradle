@@ -1,0 +1,13 @@
+architectury {
+	common project.enabled_platforms.split(',')
+}
+
+dependencies {
+	modImplementation "net.fabricmc:fabric-loader:${project.fabric_loader_version}"
+	modImplementation "dev.architectury:architectury:${project.architectury_api_version}"
+
+	compileOnly "su.plo.voice.api:client:${project.plasmovoice_api_version}"
+	compileOnly "su.plo.voice.api:server:${project.plasmovoice_api_version}"
+	compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${project.kotlin_stdlib_version}"
+	compileOnly "de.maxhenkel.voicechat:voicechat-api:${project.simplevoicechat_api_version}"
+}

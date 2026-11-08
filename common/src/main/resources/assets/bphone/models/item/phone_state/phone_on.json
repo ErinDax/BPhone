@@ -1,0 +1,8 @@
+{
+  "parent": "bphone:item/phone_state/template",
+  "textures": {
+    "0": "bphone:item/phone",
+    "particle": "bphone:item/phone",
+    "screen": "bphone:item/phone_screen_on"
+  }
+}

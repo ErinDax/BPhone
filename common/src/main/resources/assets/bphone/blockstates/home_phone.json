@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "facing=north,has_handset=true": {
+      "model": "bphone:block/home_phone"
+    },
+    "facing=north,has_handset=false": {
+      "model": "bphone:block/home_phone_no_handset"
+    },
+    "facing=east,has_handset=true": {
+      "model": "bphone:block/home_phone",
+      "y": 90
+    },
+    "facing=east,has_handset=false": {
+      "model": "bphone:block/home_phone_no_handset",
+      "y": 90
+    },
+    "facing=south,has_handset=true": {
+      "model": "bphone:block/home_phone",
+      "y": 180
+    },
+    "facing=south,has_handset=false": {
+      "model": "bphone:block/home_phone_no_handset",
+      "y": 180
+    },
+    "facing=west,has_handset=true": {
+      "model": "bphone:block/home_phone",
+      "y": 270
+    },
+    "facing=west,has_handset=false": {
+      "model": "bphone:block/home_phone_no_handset",
+      "y": 270
+    }
+  }
+}
