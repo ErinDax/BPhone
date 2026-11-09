@@ -9,14 +9,20 @@ import org.joml.Vector3f;
 public final class HomePhoneOutlineRenderer {
     private static final float COLOR = 0.0F;
     private static final float ALPHA = 0.4F;
-    private static final Cuboid[] CUBOIDS = new Cuboid[]{
-            new Cuboid(2.0F, 0.0F, 4.7F, 14.0F, 2.0F, 12.0F, -22.5F, 7.0F, 3.0F, 5.0F),
-            new Cuboid(3.0F, 0.0F, 6.0F, 13.0F, 1.0F, 8.0F, 0.0F, 0.0F, 0.0F, 0.0F),
-            new Cuboid(3.0F, 0.0F, 8.0F, 13.0F, 1.6F, 9.0F, 0.0F, 0.0F, 0.0F, 0.0F),
-            new Cuboid(3.0F, 0.0F, 9.0F, 13.0F, 3.0F, 12.0F, 0.0F, 0.0F, 0.0F, 0.0F),
-            new Cuboid(10.25F, 0.275F, 2.2F, 12.65F, 1.05F, 4.7F, -22.5F, 5.95F, 5.15F, 4.0F),
-            new Cuboid(10.25F, 1.05F, 2.2F, 12.65F, 2.65F, 12.2F, -22.5F, 5.95F, 5.15F, 4.0F),
-            new Cuboid(10.25F, 0.25F, 9.2F, 12.65F, 1.05F, 12.2F, -22.5F, 5.95F, 5.15F, 4.0F)
+    private static final FreeElementRotation TOP_ROTATION =
+            FreeElementRotation.of(-150.0F, 0.0F, 180.0F, 7.99822F, 3.5841F, 8.6145F);
+    private static final FreeElementRotation BODY_ROTATION =
+            FreeElementRotation.of(180.0F, 0.0F, 180.0F, 7.99822F, 3.5841F, 8.6145F);
+    private static final Cuboid[] BASE_CUBOIDS = new Cuboid[]{
+            new Cuboid(2.0F, 1.96227F, 3.98819F, 14.0F, 3.96227F, 12.98819F, TOP_ROTATION),
+            new Cuboid(3.0F, -0.00729F, 9.5F, 13.0F, 1.5F, 11.59131F, BODY_ROTATION),
+            new Cuboid(3.0F, -0.00729F, 7.5F, 13.0F, 2.4F, 9.59131F, BODY_ROTATION),
+            new Cuboid(3.0F, 0.0F, 4.6F, 13.0F, 4.2F, 7.6F, BODY_ROTATION)
+    };
+    private static final Cuboid[] HANDSET_CUBOIDS = new Cuboid[]{
+            new Cuboid(3.6F, 3.96227F, 4.38819F, 6.0F, 5.16227F, 12.68819F, TOP_ROTATION),
+            new Cuboid(3.6F, 2.76227F, 11.38819F, 6.0F, 3.96227F, 13.68819F, TOP_ROTATION),
+            new Cuboid(3.6F, 2.76227F, 3.38819F, 6.0F, 3.96227F, 5.68819F, TOP_ROTATION)
     };
     private static final int[][] EDGES = new int[][]{
             {0, 1}, {0, 2}, {0, 4},
@@ -32,13 +38,18 @@ public final class HomePhoneOutlineRenderer {
     }
 
     public static void render(PoseStack poseStack, VertexConsumer consumer, BlockPos pos, Direction facing,
-                              double cameraX, double cameraY, double cameraZ) {
+                              boolean hasHandset, double cameraX, double cameraY, double cameraZ) {
         poseStack.pushPose();
         poseStack.translate(pos.getX() - cameraX, pos.getY() - cameraY, pos.getZ() - cameraZ);
 
         PoseStack.Pose pose = poseStack.last();
-        for (Cuboid cuboid : CUBOIDS) {
+        for (Cuboid cuboid : BASE_CUBOIDS) {
             renderCuboid(pose, consumer, cuboid, facing);
+        }
+        if (hasHandset) {
+            for (Cuboid cuboid : HANDSET_CUBOIDS) {
+                renderCuboid(pose, consumer, cuboid, facing);
+            }
         }
 
         poseStack.popPose();
@@ -47,11 +58,9 @@ public final class HomePhoneOutlineRenderer {
     private static void renderCuboid(PoseStack.Pose pose, VertexConsumer consumer, Cuboid cuboid, Direction facing) {
         Vector3f[] corners = cuboid.corners();
         for (Vector3f corner : corners) {
-            if (cuboid.xRotationDegrees != 0.0F) {
-                rotateAroundX(corner, cuboid.xRotationDegrees, cuboid.originX, cuboid.originY, cuboid.originZ);
-            }
+            corner.div(16.0F);
+            cuboid.rotation().apply(corner);
             rotateForFacing(corner, facing);
-            corner.mul(1.0F / 16.0F);
         }
 
         for (int[] edge : EDGES) {
@@ -74,31 +83,20 @@ public final class HomePhoneOutlineRenderer {
                 .setNormal(pose, direction.x(), direction.y(), direction.z());
     }
 
-    private static void rotateAroundX(Vector3f point, float degrees, float originX, float originY, float originZ) {
-        float radians = (float) Math.toRadians(degrees);
-        float sin = (float) Math.sin(radians);
-        float cos = (float) Math.cos(radians);
-        float translatedY = point.y - originY;
-        float translatedZ = point.z - originZ;
-        float rotatedY = translatedY * cos - translatedZ * sin;
-        float rotatedZ = translatedY * sin + translatedZ * cos;
-        point.set(point.x, rotatedY + originY, rotatedZ + originZ);
-    }
-
     private static void rotateForFacing(Vector3f point, Direction facing) {
         float x = point.x;
         float z = point.z;
         switch (facing) {
-            case EAST -> point.set(16.0F - z, point.y, x);
-            case SOUTH -> point.set(16.0F - x, point.y, 16.0F - z);
-            case WEST -> point.set(z, point.y, 16.0F - x);
+            case EAST -> point.set(1.0F - z, point.y, x);
+            case SOUTH -> point.set(1.0F - x, point.y, 1.0F - z);
+            case WEST -> point.set(z, point.y, 1.0F - x);
             default -> {
             }
         }
     }
 
     private record Cuboid(float minX, float minY, float minZ, float maxX, float maxY, float maxZ,
-                          float xRotationDegrees, float originX, float originY, float originZ) {
+                          FreeElementRotation rotation) {
         private Vector3f[] corners() {
             return new Vector3f[]{
                     new Vector3f(minX, minY, minZ),

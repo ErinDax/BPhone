@@ -42,17 +42,20 @@ public final class HomePhoneBlock extends HorizontalDirectionalBlock implements 
     public static final MapCodec<HomePhoneBlock> CODEC = Block.simpleCodec(HomePhoneBlock::new);
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final BooleanProperty HAS_HANDSET = BooleanProperty.create("has_handset");
-    private static final double[][] OUTLINE_BOXES = new double[][]{
-            {2.0D, 0.0D, 4.7D, 14.0D, 4.6D, 6.8D},
-            {2.4D, 0.0D, 6.8D, 13.6D, 3.8D, 8.7D},
-            {2.8D, 0.0D, 8.7D, 13.2D, 2.9D, 10.4D},
-            {3.0D, 0.0D, 10.4D, 13.0D, 2.2D, 12.0D},
-            {10.25D, 0.25D, 2.2D, 12.65D, 3.4D, 12.2D}
+    private static final double[][] BASE_BOXES = new double[][]{
+            {2.0D, 0.0D, 4.0D, 14.0D, 2.6D, 6.0D},
+            {2.0D, 0.0D, 6.0D, 14.0D, 3.8D, 8.0D},
+            {2.0D, 0.0D, 8.0D, 14.0D, 4.9D, 10.0D},
+            {2.0D, 0.0D, 10.0D, 14.0D, 6.0D, 12.0D},
+            {2.0D, 0.0D, 12.0D, 14.0D, 6.2D, 13.5D}
     };
-    private static final VoxelShape NORTH_SHAPE = buildShape(Direction.NORTH);
-    private static final VoxelShape EAST_SHAPE = buildShape(Direction.EAST);
-    private static final VoxelShape SOUTH_SHAPE = buildShape(Direction.SOUTH);
-    private static final VoxelShape WEST_SHAPE = buildShape(Direction.WEST);
+    private static final double[][] HANDSET_BOXES = new double[][]{
+            {10.0D, 0.3D, 4.0D, 12.4D, 4.5D, 7.0D},
+            {10.0D, 3.4D, 7.0D, 12.4D, 6.0D, 10.0D},
+            {10.0D, 4.3D, 10.0D, 12.4D, 7.1D, 13.6D}
+    };
+    private static final VoxelShape[] SHAPES = buildShapes(false);
+    private static final VoxelShape[] SHAPES_WITH_HANDSET = buildShapes(true);
 
     public HomePhoneBlock(BlockBehaviour.Properties properties) {
         super(properties);
@@ -98,12 +101,12 @@ public final class HomePhoneBlock extends HorizontalDirectionalBlock implements 
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return shapeFor(state.getValue(FACING));
+        return shapeFor(state);
     }
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return shapeFor(state.getValue(FACING));
+        return shapeFor(state);
     }
 
     @Override
@@ -158,21 +161,26 @@ public final class HomePhoneBlock extends HorizontalDirectionalBlock implements 
         super.onRemove(state, level, pos, newState, isMoving);
     }
 
-    private static VoxelShape shapeFor(Direction facing) {
-        return switch (facing) {
-            case EAST -> EAST_SHAPE;
-            case SOUTH -> SOUTH_SHAPE;
-            case WEST -> WEST_SHAPE;
-            default -> NORTH_SHAPE;
-        };
+    private static VoxelShape shapeFor(BlockState state) {
+        VoxelShape[] shapes = state.getValue(HAS_HANDSET) ? SHAPES_WITH_HANDSET : SHAPES;
+        return shapes[state.getValue(FACING).get2DDataValue()];
     }
 
-    private static VoxelShape buildShape(Direction direction) {
-        VoxelShape shape = Shapes.empty();
-        for (double[] box : OUTLINE_BOXES) {
-            shape = Shapes.or(shape, rotateBox(direction, box));
+    private static VoxelShape[] buildShapes(boolean withHandset) {
+        VoxelShape[] shapes = new VoxelShape[4];
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            VoxelShape shape = Shapes.empty();
+            for (double[] box : BASE_BOXES) {
+                shape = Shapes.or(shape, rotateBox(direction, box));
+            }
+            if (withHandset) {
+                for (double[] box : HANDSET_BOXES) {
+                    shape = Shapes.or(shape, rotateBox(direction, box));
+                }
+            }
+            shapes[direction.get2DDataValue()] = shape;
         }
-        return shape;
+        return shapes;
     }
 
     private static VoxelShape rotateBox(Direction direction, double[] box) {

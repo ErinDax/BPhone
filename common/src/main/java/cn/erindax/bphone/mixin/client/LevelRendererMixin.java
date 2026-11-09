@@ -35,6 +35,7 @@ public abstract class LevelRendererMixin {
                     vertexConsumer,
                     blockPos,
                     blockState.getValue(HomePhoneBlock.FACING),
+                    blockState.getValue(HomePhoneBlock.HAS_HANDSET),
                     cameraX,
                     cameraY,
                     cameraZ);
