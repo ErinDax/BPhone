@@ -4,6 +4,9 @@
   "compatibilityLevel": "JAVA_21",
   "minVersion": "0.8",
   "client": [
+    "client.BlockElementDeserializerMixin",
+    "client.BlockElementMixin",
+    "client.BlockModelMixin",
     "client.CameraMixin",
     "client.GameRendererMixin",
     "client.GuiMixin",
