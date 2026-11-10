@@ -432,6 +432,7 @@
     "item.bphone.megaphone.dyed":  "%s Megaphone",
     "economy.bphone.reason.admin":  "Admin adjustment",
     "screen.bphone.phone.app.map":  "Map",
+    "screen.bphone.phone.home.day":  "Day %s",
     "commands.bphone.unavailable":  "Server storage is not ready yet",
     "commands.bphone.money.unavailable":  "No economy is available",
     "commands.bphone.money.info":  "Economy provided by %s",

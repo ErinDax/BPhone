@@ -432,6 +432,7 @@
     "item.bphone.megaphone.dyed":  "โทรโข่ง%s",
     "economy.bphone.reason.admin":  "ผู้ดูแลปรับยอด",
     "screen.bphone.phone.app.map":  "แผนที่",
+    "screen.bphone.phone.home.day":  "วันที่ %s",
     "commands.bphone.unavailable":  "ที่เก็บข้อมูลของเซิร์ฟเวอร์ยังไม่พร้อม",
     "commands.bphone.money.unavailable":  "ยังไม่มีระบบเศรษฐกิจให้ใช้",
     "commands.bphone.money.info":  "ระบบเศรษฐกิจปัจจุบันมาจาก %s",

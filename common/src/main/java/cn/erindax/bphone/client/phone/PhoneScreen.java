@@ -1658,23 +1658,40 @@ public final class PhoneScreen extends Screen {
             return;
         }
 
-        if (!unlocked) {
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.level != null) {
-                long gameTime = minecraft.level.getDayTime() % 24000L;
-                int hours = (int) ((gameTime + 6000) / 1000) % 24;
-                int minutes = (int) ((gameTime % 1000) * 60 / 1000);
-
-                Component timeText = Component.literal(String.format("%02d:%02d", hours, minutes));
-                float timeScale = Math.max(1.55F, scale * 1.95F);
-                int textWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, timeText, timeScale);
-                int textHeight = PhoneScreenDraw.scaledTextHeight(minecraft.font, timeScale);
-                int textX = displayX + (displayWidth - textWidth) / 2;
-                int textY = displayY + Math.round(displayHeight * 0.24F) - (textHeight / 2);
-
-                PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, timeText, textX, textY, 0xFF404040, false, timeScale);
-            }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null || (unlocked && !homeWidgetsShown)) {
+            return;
         }
+
+        long dayTime = minecraft.level.getDayTime();
+        long gameTime = dayTime % 24000L;
+        int hours = (int) ((gameTime + 6000) / 1000) % 24;
+        int minutes = (int) ((gameTime % 1000) * 60 / 1000);
+        Component timeText = Component.literal(String.format("%02d:%02d", hours, minutes));
+
+        if (!unlocked) {
+            float timeScale = Math.max(1.55F, scale * 1.95F);
+            int textWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, timeText, timeScale);
+            int textHeight = PhoneScreenDraw.scaledTextHeight(minecraft.font, timeScale);
+            int textX = displayX + (displayWidth - textWidth) / 2;
+            int textY = displayY + Math.round(displayHeight * 0.24F) - (textHeight / 2);
+
+            PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, timeText, textX, textY, 0xFF404040, false, timeScale);
+            return;
+        }
+
+        float timeScale = Math.max(1.2F, scale * 1.5F);
+        int timeWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, timeText, timeScale);
+        int timeHeight = PhoneScreenDraw.scaledTextHeight(minecraft.font, timeScale);
+        int timeY = displayY + Math.round(displayHeight * 0.12F);
+        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, timeText, displayX + (displayWidth - timeWidth) / 2,
+                timeY, 0xFF404040, false, timeScale);
+
+        Component dayText = Component.translatable("screen.bphone.phone.home.day", dayTime / 24000L + 1);
+        float dayScale = new PhoneChatLayout(this).bodyScale;
+        int dayWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, dayText, dayScale);
+        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, dayText, displayX + (displayWidth - dayWidth) / 2,
+                timeY + timeHeight + Math.round(4 * scale), 0xFF505050, false, dayScale);
     }
 
     private void renderGallerySurface(GuiGraphics guiGraphics) {

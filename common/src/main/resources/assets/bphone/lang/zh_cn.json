@@ -432,6 +432,7 @@
     "item.bphone.megaphone.dyed":  "%s扩音器",
     "economy.bphone.reason.admin":  "管理员调整",
     "screen.bphone.phone.app.map":  "地图",
+    "screen.bphone.phone.home.day":  "第 %s 天",
     "commands.bphone.unavailable":  "服务器存储还没有准备好",
     "commands.bphone.money.unavailable":  "当前没有可用的经济系统",
     "commands.bphone.money.info":  "当前经济由 %s 提供",
