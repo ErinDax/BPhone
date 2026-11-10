@@ -33,6 +33,10 @@ final class PhoneMapApp {
 
     static final int STYLE_TERRAIN = 0;
     static final int STYLE_PLAIN = 1;
+    static final int STYLE_CITY = 2;
+    private static final String[] STYLE_KEYS = {
+            "map.bphone.style.terrain", "map.bphone.style.plain", "map.bphone.style.city"
+    };
 
     static final int TOOL_NONE = 0;
     static final int TOOL_MARKER = 1;
@@ -239,8 +243,9 @@ final class PhoneMapApp {
     }
 
     void toggleStyle() {
-        style = style == STYLE_TERRAIN ? STYLE_PLAIN : STYLE_TERRAIN;
+        style = (style + 1) % STYLE_KEYS.length;
         savedStyle = style;
+        status(Component.translatable(STYLE_KEYS[style]));
     }
 
     void clearSelection() {

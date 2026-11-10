@@ -158,21 +158,23 @@ final class PhoneMapSurfaceRenderer {
         UiRect viewport = mapViewport(layout);
         View view = view(app, layout);
         String dimension = app.dimension();
-        boolean dark = isDark();
-        boolean terrain = app.style == PhoneMapApp.STYLE_TERRAIN && MapTerrainCache.isAvailable();
+        boolean city = app.style == PhoneMapApp.STYLE_CITY;
+        boolean dark = city || isDark();
+        boolean terrain = app.style != PhoneMapApp.STYLE_PLAIN && MapTerrainCache.isAvailable();
 
         graphics.enableScissor(viewport.left, viewport.top, viewport.right(), viewport.bottom());
         MapDraw draw = new MapDraw(graphics);
-        int background = terrain ? (dark ? 0xFF2A2D33 : 0xFFD9D5CE) : (dark ? 0xFF1E2126 : 0xFFF1EEE8);
+        int background = city ? 0xFF0B171B
+                : terrain ? (dark ? 0xFF2A2D33 : 0xFFD9D5CE) : (dark ? 0xFF1E2126 : 0xFFF1EEE8);
         draw.rect(viewport.left, viewport.top, viewport.right(), viewport.bottom(), background);
         draw.flush();
         if (terrain) {
-            renderTerrain(draw, view);
+            renderTerrain(draw, view, city);
         }
         List<MapData.Area> areas = MapClientState.areas(dimension);
         List<MapData.Road> roads = MapClientState.roads(dimension);
-        renderAreas(draw, view, areas, dark);
-        renderRoads(draw, view, roads, dark);
+        renderAreas(draw, view, areas, dark, city);
+        renderRoads(draw, view, roads, dark, city);
         renderTransit(draw, view, dimension, layout);
         renderRoute(draw, view, layout);
         renderDraft(screen, draw, view, app, layout);
@@ -181,7 +183,7 @@ final class PhoneMapSurfaceRenderer {
         List<Label> labels = new ArrayList<>();
         renderAreaLabels(draw, view, areas, layout, dark);
         renderRoadLabels(draw, view, roads, layout, dark);
-        renderMarkers(screen, graphics, draw, view, app, layout, dimension, labels);
+        renderMarkers(screen, graphics, draw, view, app, layout, dimension, labels, dark);
         placeLabels(draw, view, labels, layout, dark);
         renderPlayer(draw, view, layout);
         draw.flush();
@@ -189,7 +191,7 @@ final class PhoneMapSurfaceRenderer {
         draw.clearDepth();
 
         renderNorth(graphics, draw, layout, viewport);
-        renderScale(graphics, draw, layout, viewport, app, overlayBottom(app, layout, viewport));
+        renderScale(graphics, draw, layout, viewport, app, overlayBottom(app, layout, viewport), dark);
         renderFloatingButtons(screen, graphics, draw, app, layout, viewport);
         if (MapNavigation.isActive()) {
             renderNavBanner(screen, graphics, draw, layout, viewport);
@@ -204,7 +206,7 @@ final class PhoneMapSurfaceRenderer {
         }
     }
 
-    private static void renderTerrain(MapDraw draw, View view) {
+    private static void renderTerrain(MapDraw draw, View view, boolean city) {
         MapTerrainCache.beginFrame();
         int size = MapTerrainCache.TILE_SIZE;
         int minTileX = Math.floorDiv(Mth.floor(view.wx(view.viewport().left)), size);
@@ -216,7 +218,8 @@ final class PhoneMapSurfaceRenderer {
         }
         for (int tileZ = minTileZ; tileZ <= maxTileZ; tileZ++) {
             for (int tileX = minTileX; tileX <= maxTileX; tileX++) {
-                ResourceLocation texture = MapTerrainCache.texture(tileX, tileZ);
+                ResourceLocation texture = city ? MapTerrainCache.cityTexture(tileX, tileZ)
+                        : MapTerrainCache.texture(tileX, tileZ);
                 if (texture != null) {
                     draw.texture(texture, view.sx(tileX * size), view.sy(tileZ * size),
                             view.sx((tileX + 1) * size), view.sy((tileZ + 1) * size), 0.0F, 0.0F, 1.0F, 1.0F);
@@ -225,7 +228,17 @@ final class PhoneMapSurfaceRenderer {
         }
     }
 
-    private static int[] areaFill(int kind, boolean dark) {
+    private static int[] areaFill(int kind, boolean dark, boolean city) {
+        if (city) {
+            return switch (kind) {
+                case MapData.AREA_PARK -> new int[] {0x8024483A, 0xFF33604C};
+                case MapData.AREA_WATER -> new int[] {0xC0336466, 0xFF4A8587};
+                case MapData.AREA_BUILDING -> new int[] {0xC01D3439, 0xFF2D4C53};
+                case MapData.AREA_PLAZA -> new int[] {0x992A4248, 0xFF3D5D64};
+                case MapData.AREA_RESTRICTED -> new int[] {0x80602828, 0xFFB84A4A};
+                default -> new int[] {0x2236C5CF, 0xB036C5CF};
+            };
+        }
         return switch (kind) {
             case MapData.AREA_PARK -> dark ? new int[] {0x9945704A, 0xFF4E7D51} : new int[] {0xB0A8D5A2, 0xFF8BC383};
             case MapData.AREA_WATER -> dark ? new int[] {0xAA2B4A6B, 0xFF3D6188} : new int[] {0xC09DC8EE, 0xFF7FB2E3};
@@ -252,7 +265,7 @@ final class PhoneMapSurfaceRenderer {
         });
     }
 
-    private static void renderAreas(MapDraw draw, View view, List<MapData.Area> areas, boolean dark) {
+    private static void renderAreas(MapDraw draw, View view, List<MapData.Area> areas, boolean dark, boolean city) {
         for (int pass = 0; pass < 2; pass++) {
             for (MapData.Area area : areas) {
                 boolean district = area.kind() == MapData.AREA_DISTRICT;
@@ -265,7 +278,7 @@ final class PhoneMapSurfaceRenderer {
                 if (!project(view, area.points(), xs, ys)) {
                     continue;
                 }
-                int[] colors = areaFill(area.kind(), dark);
+                int[] colors = areaFill(area.kind(), dark, city);
                 draw.fillTriangles(xs, ys, triangles(area), colors[0]);
                 draw.outline(xs, ys, count, district || area.kind() == MapData.AREA_RESTRICTED ? 1.2F : 1.0F,
                         colors[1], district || area.kind() == MapData.AREA_RESTRICTED);
@@ -291,11 +304,19 @@ final class PhoneMapSurfaceRenderer {
                 && minY <= viewport.bottom() + 8;
     }
 
+    private static int cityRoadFill(int kind) {
+        return switch (kind) {
+            case MapData.ROAD_AVENUE -> 0xFF4D8389;
+            case MapData.ROAD_STREET -> 0xFF31575E;
+            default -> 0xFF27474D;
+        };
+    }
+
     private static float roadWidth(int kind, float zoom) {
         return Mth.clamp(ROAD_BLOCKS[kind] * zoom, ROAD_MIN_PX[kind], 36.0F);
     }
 
-    private static void renderRoads(MapDraw draw, View view, List<MapData.Road> roads, boolean dark) {
+    private static void renderRoads(MapDraw draw, View view, List<MapData.Road> roads, boolean dark, boolean city) {
         int[] order = {MapData.ROAD_RAIL, MapData.ROAD_PATH, MapData.ROAD_STREET, MapData.ROAD_AVENUE};
         List<float[][]> projected = new ArrayList<>(roads.size());
         for (MapData.Road road : roads) {
@@ -316,22 +337,23 @@ final class PhoneMapSurfaceRenderer {
                     int count = road.points().size();
                     if (kind == MapData.ROAD_RAIL) {
                         if (pass == 0) {
-                            draw.polyline(points[0], points[1], count, width + 1.0F, dark ? 0xFF8A8F99 : 0xFF7B7F87);
+                            draw.polyline(points[0], points[1], count, width + 1.0F,
+                                    city ? 0xFF4B6D72 : dark ? 0xFF8A8F99 : 0xFF7B7F87);
                         } else {
                             for (int segment = 0; segment + 1 < count; segment++) {
                                 draw.dashed(points[0][segment], points[1][segment], points[0][segment + 1],
                                         points[1][segment + 1], Math.max(0.8F, width - 1.0F), 3.0F,
-                                        dark ? 0xFF2A2D33 : 0xFFFFFFFF);
+                                        city ? 0xFF0E1E23 : dark ? 0xFF2A2D33 : 0xFFFFFFFF);
                             }
                         }
                         continue;
                     }
                     if (pass == 0) {
-                        int casing = kind == MapData.ROAD_AVENUE ? (dark ? 0xFF7A6332 : 0xFFE0A946)
+                        int casing = city ? 0xFF0A1619 : kind == MapData.ROAD_AVENUE ? (dark ? 0xFF7A6332 : 0xFFE0A946)
                                 : (dark ? 0xFF3B3F47 : 0xFFC9C3B8);
                         draw.polyline(points[0], points[1], count, width + Math.max(1.5F, width * 0.35F), casing);
                     } else {
-                        int fill = kind == MapData.ROAD_AVENUE ? (dark ? 0xFFA88A4A : 0xFFFFD27F)
+                        int fill = city ? cityRoadFill(kind) : kind == MapData.ROAD_AVENUE ? (dark ? 0xFFA88A4A : 0xFFFFD27F)
                                 : (dark ? 0xFF5A5F69 : 0xFFFFFFFF);
                         draw.polyline(points[0], points[1], count, width, fill);
                     }
@@ -527,8 +549,7 @@ final class PhoneMapSurfaceRenderer {
     }
 
     private static void renderMarkers(PhoneScreen screen, GuiGraphics graphics, MapDraw draw, View view, PhoneMapApp app,
-                                      PhoneChatLayout layout, String dimension, List<Label> labels) {
-        boolean dark = isDark();
+                                      PhoneChatLayout layout, String dimension, List<Label> labels, boolean dark) {
         float radius = Math.max(4.0F, layout.u(5.5F));
         List<float[]> glyphs = new ArrayList<>();
         List<MapData.Marker> glyphMarkers = new ArrayList<>();
@@ -705,7 +726,7 @@ final class PhoneMapSurfaceRenderer {
             UiRect rect = floatingButton(layout, viewport, slot);
             int type = buttons[slot];
             boolean active = (type == BUTTON_EDIT && app.editing) || (type == BUTTON_LOCATE && app.follow)
-                    || (type == BUTTON_LAYERS && app.style == PhoneMapApp.STYLE_PLAIN);
+                    || (type == BUTTON_LAYERS && app.style != PhoneMapApp.STYLE_TERRAIN);
             fillRounded(graphics, rect.left - 1, rect.top - 1, rect.width + 2, rect.height + 2, layout.radius + 1, HAIRLINE);
             fillRounded(graphics, rect.left, rect.top, rect.width, rect.height, layout.radius,
                     active ? ACCENT : hovered(screen, rect) ? HOVER : SURFACE);
@@ -939,15 +960,15 @@ final class PhoneMapSurfaceRenderer {
     }
 
     private static void renderScale(GuiGraphics graphics, MapDraw draw, PhoneChatLayout layout, UiRect viewport,
-                                    PhoneMapApp app, int bottom) {
+                                    PhoneMapApp app, int bottom, boolean dark) {
         double target = 40.0D / app.zoom;
         double magnitude = Math.pow(10.0D, Math.floor(Math.log10(target)));
         double nice = target / magnitude >= 5 ? 5 * magnitude : target / magnitude >= 2 ? 2 * magnitude : magnitude;
         float length = (float) (nice * app.zoom);
         int left = viewport.left + layout.pad;
         int y = bottom - layout.pad - 2;
-        int color = isDark() ? 0xFFE8EAED : 0xFF2B2F36;
-        draw.rect(left - 1, y - 1, left + length + 1, y + 2, 0xCCFFFFFF);
+        int color = dark ? 0xFFE8EAED : 0xFF2B2F36;
+        draw.rect(left - 1, y - 1, left + length + 1, y + 2, dark ? 0xCC15171A : 0xCCFFFFFF);
         draw.rect(left, y, left + length, y + 1, color);
         draw.rect(left, y - 3, left + 1, y + 1, color);
         draw.rect(left + length - 1, y - 3, left + length, y + 1, color);

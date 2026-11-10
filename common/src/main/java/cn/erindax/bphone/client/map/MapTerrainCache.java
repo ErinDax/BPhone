@@ -58,6 +58,9 @@ public final class MapTerrainCache {
         DynamicTexture texture;
         ResourceLocation textureId;
         boolean textureDirty;
+        DynamicTexture cityTexture;
+        ResourceLocation cityTextureId;
+        boolean cityDirty;
         boolean diskDirty;
 
         Tile(int tileX, int tileZ, NativeImage image) {
@@ -146,6 +149,56 @@ public final class MapTerrainCache {
             tile.textureDirty = false;
         }
         return tile.textureId;
+    }
+
+    public static ResourceLocation cityTexture(int tileX, int tileZ) {
+        Tile tile = tile(tileX, tileZ, false);
+        if (tile == null) {
+            return null;
+        }
+        if (tile.cityTexture == null) {
+            NativeImage image = new NativeImage(NativeImage.Format.RGBA, TILE_SIZE, TILE_SIZE, false);
+            recolor(tile.image, image);
+            tile.cityTexture = new DynamicTexture(image);
+            tile.cityTextureId = BPhone.id("mapcache/c" + (textureSerial++));
+            Minecraft.getInstance().getTextureManager().register(tile.cityTextureId, tile.cityTexture);
+            tile.cityDirty = false;
+        } else if (tile.cityDirty) {
+            recolor(tile.image, tile.cityTexture.getPixels());
+            tile.cityTexture.upload();
+            tile.cityDirty = false;
+        }
+        return tile.cityTextureId;
+    }
+
+    private static void recolor(NativeImage source, NativeImage target) {
+        for (int y = 0; y < TILE_SIZE; y++) {
+            for (int x = 0; x < TILE_SIZE; x++) {
+                target.setPixelRGBA(x, y, cityPixel(source.getPixelRGBA(x, y)));
+            }
+        }
+    }
+
+    private static int cityPixel(int abgr) {
+        if ((abgr >>> 24) == 0) {
+            return 0;
+        }
+        int red = abgr & 0xFF;
+        int green = (abgr >> 8) & 0xFF;
+        int blue = (abgr >> 16) & 0xFF;
+        if (Math.abs(red - green) <= 2 && blue > 100 && blue >= red * 3) {
+            float shade = 0.75F + 0.35F * blue / 255.0F;
+            return abgr(56.0F * shade, 106.0F * shade, 110.0F * shade);
+        }
+        float light = (red * 0.30F + green * 0.59F + blue * 0.11F) / 255.0F;
+        return abgr(11.0F + 12.0F * light, 25.0F + 14.0F * light, 29.0F + 14.0F * light);
+    }
+
+    private static int abgr(float red, float green, float blue) {
+        int r = Math.min(255, Math.round(red));
+        int g = Math.min(255, Math.round(green));
+        int b = Math.min(255, Math.round(blue));
+        return 0xFF000000 | (b << 16) | (g << 8) | r;
     }
 
     private static void refill(Minecraft minecraft) {
@@ -239,6 +292,7 @@ public final class MapTerrainCache {
         }
         if (changed) {
             tile.textureDirty = true;
+            tile.cityDirty = true;
             tile.diskDirty = true;
         }
     }
@@ -321,6 +375,10 @@ public final class MapTerrainCache {
     }
 
     private static void release(Tile tile) {
+        if (tile.cityTexture != null) {
+            Minecraft.getInstance().getTextureManager().release(tile.cityTextureId);
+            tile.cityTexture = null;
+        }
         if (tile.texture != null) {
             Minecraft.getInstance().getTextureManager().release(tile.textureId);
             tile.texture = null;
