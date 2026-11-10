@@ -545,7 +545,7 @@ final class PhoneChatSurfaceRenderer {
         UiRect icon = layout.rowAvatar(row, layout.avatarSmall);
         renderGroupAvatar(guiGraphics, layout, icon, Component.translatable("phone.chat.group.icon").getString());
         int textLeft = layout.rowTextLeft(row, layout.avatarSmall);
-        int textRight = row.right() - layout.pad - layout.u(8);
+        int textRight = row.right() - layout.pad - layout.chevronReserve();
         drawText(guiGraphics, layout, fit(layout, label.getString(), PLAIN, textRight - textLeft, layout.bodyScale),
                 textLeft, row.top + (row.height - layout.bodyHeight) / 2, TEXT, layout.bodyScale);
         renderChevron(guiGraphics, layout, row);
@@ -620,7 +620,7 @@ final class PhoneChatSurfaceRenderer {
             renderFace(guiGraphics, screen.getPlayerSkin(player), face, background);
             int textLeft = layout.rowTextLeft(row, layout.avatar);
             renderChevron(guiGraphics, layout, row);
-            renderTwoLineText(guiGraphics, layout, row, textLeft, row.right() - layout.pad - layout.u(8),
+            renderTwoLineText(guiGraphics, layout, row, textLeft, row.right() - layout.pad - layout.chevronReserve(),
                     player.getProfile().getName(), TEXT,
                     screen.getPlayerPhoneNumber(player.getProfile().getId()), TEXT_TERTIARY);
             if (index < players.size() - 1) {
@@ -1486,20 +1486,23 @@ final class PhoneChatSurfaceRenderer {
             Component label = fit(layout, raw, style, available, labelScale);
             int labelWidth = layout.width(label, labelScale);
             int blockHeight = labelHeight + indicatorGap + indicatorHeight;
+            int badge = index == PhoneChatLayout.TAB_CONTACTS ? requestCount
+                    : index == PhoneChatLayout.TAB_CHATS ? unreadCount : 0;
+            int badgeSpace = badge > 0 ? layout.u(1) + 2 * Math.max(1, layout.u(1)) + badgeWidth(layout, badge) : 0;
             int labelX = slot.left + (slot.width - labelWidth) / 2;
+            labelX = Math.max(slot.left + layout.u(2), Math.min(labelX, slot.right() - badgeSpace - labelWidth));
             int labelY = slot.top + 1 + (slot.height - 1 - blockHeight) / 2;
             int color = active ? ACCENT : hovered(screen, slot) ? TEXT : TEXT_SECONDARY;
             drawText(guiGraphics, layout, label, labelX, labelY, color, labelScale);
             if (active) {
                 int indicatorWidth = Math.max(layout.u(10), labelWidth / 2);
-                int indicatorX = slot.left + (slot.width - indicatorWidth) / 2;
+                int indicatorX = labelX + (labelWidth - indicatorWidth) / 2;
                 int indicatorY = labelY + labelHeight + indicatorGap;
                 guiGraphics.fill(indicatorX, indicatorY, indicatorX + indicatorWidth, indicatorY + indicatorHeight, ACCENT);
             }
-            int badge = index == PhoneChatLayout.TAB_CONTACTS ? requestCount
-                    : index == PhoneChatLayout.TAB_CHATS ? unreadCount : 0;
             if (badge > 0) {
-                renderBadge(guiGraphics, layout, labelX + labelWidth + layout.u(1), labelY, badge);
+                int badgeLimit = slot.right() - badgeWidth(layout, badge) - 2 * Math.max(1, layout.u(1));
+                renderBadge(guiGraphics, layout, Math.min(labelX + labelWidth + layout.u(1), badgeLimit), labelY, badge);
             }
         }
     }

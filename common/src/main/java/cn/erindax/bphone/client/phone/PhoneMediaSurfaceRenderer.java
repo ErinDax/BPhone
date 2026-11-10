@@ -329,11 +329,22 @@ final class PhoneMediaSurfaceRenderer {
         };
         var font = Minecraft.getInstance().font;
         int hintGap = Math.max(1, Math.round(2 * screen.scale));
-        int lineY = hintY;
-        for (Component hint : hints) {
-            float hintScale = PhoneScreenDraw.textScaleToFit(font, hint, hintWidth);
-            PhoneScreenDraw.drawScaledText(guiGraphics, font, hint, hintX, lineY, 0xFFF7F9FF, true, hintScale);
-            lineY += PhoneScreenDraw.scaledTextHeight(font, hintScale) + hintGap;
+        int pad = Math.max(3, Math.round(5 * screen.scale));
+        float[] hintScales = new float[hints.length];
+        int panelWidth = 0;
+        int panelHeight = 0;
+        for (int index = 0; index < hints.length; index++) {
+            hintScales[index] = PhoneScreenDraw.textScaleToFit(font, hints[index], hintWidth - 2 * pad);
+            panelWidth = Math.max(panelWidth, PhoneScreenDraw.scaledTextWidth(font, hints[index], hintScales[index]));
+            panelHeight += PhoneScreenDraw.scaledTextHeight(font, hintScales[index]) + (index > 0 ? hintGap : 0);
+        }
+        panelHeight -= Math.max(1, Math.round(hintScales[hints.length - 1]));
+        PhoneUi.fillRounded(guiGraphics, hintX, hintY, panelWidth + 2 * pad, panelHeight + 2 * pad, pad, 0x99000000);
+        int lineY = hintY + pad;
+        for (int index = 0; index < hints.length; index++) {
+            PhoneScreenDraw.drawScaledText(guiGraphics, font, hints[index], hintX + pad, lineY, 0xFFF7F9FF, true,
+                    hintScales[index]);
+            lineY += PhoneScreenDraw.scaledTextHeight(font, hintScales[index]) + hintGap;
         }
     }
 }

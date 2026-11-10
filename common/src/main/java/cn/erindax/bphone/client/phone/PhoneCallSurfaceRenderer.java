@@ -78,6 +78,7 @@ final class PhoneCallSurfaceRenderer {
 
     static void renderCallRecentsSurface(PhoneScreen screen, GuiGraphics guiGraphics) {
         Minecraft minecraft = Minecraft.getInstance();
+        float captionScale = new PhoneChatLayout(screen).captionScale;
         UiRect contentBounds = screen.getCallSurfaceBounds();
         int headerHeight = screen.getCallHeaderHeight();
 
@@ -146,7 +147,7 @@ final class PhoneCallSurfaceRenderer {
                         0xFF000000, false, nameScale);
 
                 Component timeText = formatRelativeTime(entry.timestamp());
-                float timeScale = Math.min(0.38F, PhoneScreenDraw.textScaleToFit(minecraft.font, timeText,
+                float timeScale = Math.min(captionScale, PhoneScreenDraw.textScaleToFit(minecraft.font, timeText,
                         Math.max(30, Math.round(40 * screen.scale)), 0.33F));
                 int timeWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, timeText, timeScale);
                 int timeX = left + width - timeWidth - Math.max(2, Math.round(3 * screen.scale));
@@ -156,7 +157,7 @@ final class PhoneCallSurfaceRenderer {
                 Component subLabel = entry.callType().equals("INCOMING") || entry.callType().equals("OUTGOING")
                         ? formatDuration(entry.durationTicks()) : null;
                 if (subLabel != null) {
-                    float subScale = Math.min(0.38F, PhoneScreenDraw.textScaleToFit(minecraft.font, subLabel,
+                    float subScale = Math.min(captionScale, PhoneScreenDraw.textScaleToFit(minecraft.font, subLabel,
                             textWidth, 0.33F));
                     int subY = y + Math.round(rowHeight * 0.55F);
                     PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, subLabel,
@@ -533,7 +534,8 @@ final class PhoneCallSurfaceRenderer {
 
         int labelY = bounds.bottom() + Math.max(1, Math.round(2 * screen.scale));
         int labelMaxWidth = bounds.width + Math.max(8, Math.round(10 * screen.scale));
-        float labelScale = Math.min(0.40F, PhoneScreenDraw.textScaleToFit(minecraft.font, label, labelMaxWidth, 0.32F));
+        float labelScale = Math.min(new PhoneChatLayout(screen).captionScale,
+                PhoneScreenDraw.textScaleToFit(minecraft.font, label, labelMaxWidth, 0.32F));
         int labelWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, label, labelScale);
         int labelX = bounds.left + (bounds.width - labelWidth) / 2;
         int labelColor = active ? 0xFF007AFF : 0xFF8E8E93;

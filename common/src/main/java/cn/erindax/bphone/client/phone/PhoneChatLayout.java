@@ -123,6 +123,14 @@ final class PhoneChatLayout {
         return Math.max(1, Math.round(value * scale));
     }
 
+    int chevronArm() {
+        return Math.max(2, captionHeight / 2);
+    }
+
+    int chevronReserve() {
+        return chevronArm() + 1 + gap;
+    }
+
     int width(Component text, float textScale) {
         return Mth.ceil(font.width(text) * textScale);
     }
@@ -134,7 +142,7 @@ final class PhoneChatLayout {
     private float crisp(float desired) {
         float snapped = Math.round(desired * guiScale) / (float) guiScale;
         float minimum = Math.min(1.0F, 2.0F / guiScale);
-        return Mth.clamp(snapped, minimum, 1.0F);
+        return Math.max(snapped, minimum);
     }
 
     private static int glyphHeight(float textScale) {

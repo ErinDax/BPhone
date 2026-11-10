@@ -7,10 +7,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import static cn.erindax.bphone.client.phone.PhoneUi.*;
 
@@ -148,7 +145,7 @@ final class PhoneNotificationsSurfaceRenderer {
         int right = row.right() - layout.pad;
         int blockHeight = layout.bodyHeight + layout.textGap + layout.captionHeight;
         int top = row.top + (row.height - blockHeight) / 2;
-        Component time = Component.literal(formatTime(notification.time()));
+        Component time = Component.literal(PhoneChatThread.timeLabel(notification.time(), true));
         int timeWidth = layout.width(time, layout.captionScale);
         drawText(guiGraphics, layout, time, right - timeWidth, top + Math.max(0, layout.bodyHeight - layout.captionHeight),
                 TEXT_TERTIARY, layout.captionScale);
@@ -188,8 +185,8 @@ final class PhoneNotificationsSurfaceRenderer {
 
         int y = top + layout.u(8);
         String meta = notification.source().isBlank()
-                ? formatTime(notification.time())
-                : notification.source() + "  " + formatTime(notification.time());
+                ? PhoneChatThread.timeLabel(notification.time(), false)
+                : notification.source() + "  " + PhoneChatThread.timeLabel(notification.time(), false);
         drawText(guiGraphics, layout, fit(layout, meta, PLAIN, width, layout.captionScale), left, y, TEXT_TERTIARY,
                 layout.captionScale);
         y += layout.captionHeight + layout.u(6);
@@ -202,9 +199,5 @@ final class PhoneNotificationsSurfaceRenderer {
         drawWrapped(guiGraphics, layout, Component.literal(notification.body()), left, y, width, TEXT_SECONDARY,
                 layout.bodyScale);
         guiGraphics.disableScissor();
-    }
-
-    private static String formatTime(long time) {
-        return new SimpleDateFormat("MM-dd HH:mm", Locale.ROOT).format(new Date(time));
     }
 }

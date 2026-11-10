@@ -279,8 +279,7 @@ final class PhoneUi {
         if (hovered(screen, row)) {
             guiGraphics.fill(row.left, row.top, row.right(), row.bottom() - 1, HOVER);
         }
-        int chevronSpace = layout.u(8);
-        int right = row.right() - layout.pad - chevronSpace;
+        int right = row.right() - layout.pad - layout.chevronReserve();
         int y = row.top + (row.height - layout.bodyHeight) / 2;
         int valueWidth = 0;
         if (value != null) {
@@ -326,14 +325,14 @@ final class PhoneUi {
                     0.0F, 0.0F, 24, 24, 24, 24);
         }
         int textLeft = layout.rowTextLeft(row, layout.avatarSmall);
-        int textRight = row.right() - layout.pad - layout.u(8);
+        int textRight = row.right() - layout.pad - layout.chevronReserve();
         drawText(guiGraphics, layout, fit(layout, label.getString(), PLAIN, textRight - textLeft, layout.bodyScale),
                 textLeft, row.top + (row.height - layout.bodyHeight) / 2, TEXT, layout.bodyScale);
         renderChevron(guiGraphics, layout, row);
     }
 
     static void renderChevron(GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect row) {
-        int arm = Math.max(2, layout.captionHeight / 2);
+        int arm = layout.chevronArm();
         int left = row.right() - layout.pad - arm - 1;
         int centerY = row.top + row.height / 2;
         for (int step = 0; step <= arm; step++) {

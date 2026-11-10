@@ -1269,7 +1269,7 @@ final class PhoneMapSurfaceRenderer {
             graphics.fill(row.left, row.top, row.right(), row.bottom(), background);
             UiRect icon = layout.rowAvatar(row, layout.avatarSmall);
             int textLeft = layout.rowTextLeft(row, layout.avatarSmall);
-            int textRight = row.right() - layout.pad - layout.u(8);
+            int textRight = row.right() - layout.pad - layout.chevronReserve();
             if (index < offset) {
                 fillRounded(graphics, icon.left, icon.top, icon.width, icon.height, icon.width / 2, ACCENT);
                 drawCentered(graphics, layout, Component.literal("+").withStyle(BOLD), icon.left + icon.width / 2,
@@ -1386,7 +1386,7 @@ final class PhoneMapSurfaceRenderer {
             String detail = marker == null ? "" : marker.dimension().equals(app.dimension())
                     ? MapNavigation.formatDistance(app.distanceTo(marker.x(), marker.z()))
                     : Component.translatable("map.bphone.nav.other_dimension").getString();
-            renderTwoLineText(graphics, layout, row, textLeft, row.right() - layout.pad - layout.u(8), name, TEXT, detail,
+            renderTwoLineText(graphics, layout, row, textLeft, row.right() - layout.pad - layout.chevronReserve(), name, TEXT, detail,
                     TEXT_TERTIARY);
             renderChevron(graphics, layout, row);
         }

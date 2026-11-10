@@ -10,10 +10,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import static cn.erindax.bphone.client.phone.PhoneUi.*;
 
@@ -74,7 +71,7 @@ final class PhoneAnnouncementsSurfaceRenderer {
         int right = row.right() - layout.pad;
         int blockHeight = layout.bodyHeight + layout.textGap + layout.captionHeight;
         int top = row.top + (row.height - blockHeight) / 2;
-        Component time = Component.literal(formatTime(announcement.time()));
+        Component time = Component.literal(PhoneChatThread.timeLabel(announcement.time(), true));
         int timeWidth = layout.width(time, layout.captionScale);
         drawText(guiGraphics, layout, time, right - timeWidth, top + Math.max(0, layout.bodyHeight - layout.captionHeight),
                 TEXT_TERTIARY, layout.captionScale);
@@ -97,13 +94,37 @@ final class PhoneAnnouncementsSurfaceRenderer {
         return layout.bottomBar();
     }
 
-    private static UiRect[] actionButtons(PhoneChatLayout layout) {
+    private static Component[] actionLabels(PhoneScreen screen, Announcement announcement) {
+        return new Component[]{
+                Component.translatable("screen.bphone.phone.announcements.edit"),
+                Component.translatable(announcement.starred()
+                        ? "screen.bphone.phone.announcements.unstar" : "screen.bphone.phone.announcements.star"),
+                Component.translatable(screen.announcementDeleteConfirm > 0
+                        ? "screen.bphone.phone.announcements.delete_confirm" : "screen.bphone.phone.announcements.delete")
+        };
+    }
+
+    private static UiRect[] actionButtons(PhoneChatLayout layout, Component[] labels) {
         UiRect bar = actionBar(layout);
-        int width = (bar.width - 4 * layout.pad) / 3;
+        int count = labels.length;
+        int available = bar.width - (count + 1) * layout.pad;
+        int[] needed = new int[count];
+        int total = 0;
+        int widest = 0;
+        for (int index = 0; index < count; index++) {
+            needed[index] = layout.width(labels[index].copy().withStyle(BOLD), layout.bodyScale) + 2 * layout.u(3);
+            total += needed[index];
+            widest = Math.max(widest, needed[index]);
+        }
+        boolean equal = widest * count <= available || total >= available;
+        int extra = equal ? 0 : (available - total) / count;
         int top = bar.top + (bar.height - layout.smallButtonHeight) / 2;
-        UiRect[] buttons = new UiRect[3];
-        for (int index = 0; index < 3; index++) {
-            buttons[index] = new UiRect(bar.left + layout.pad + index * (width + layout.pad), top, width, layout.smallButtonHeight);
+        UiRect[] buttons = new UiRect[count];
+        int left = bar.left + layout.pad;
+        for (int index = 0; index < count; index++) {
+            int width = equal ? available / count : needed[index] + extra;
+            buttons[index] = new UiRect(left, top, width, layout.smallButtonHeight);
+            left += width + layout.pad;
         }
         return buttons;
     }
@@ -146,7 +167,7 @@ final class PhoneAnnouncementsSurfaceRenderer {
             y += layout.bodyLine;
         }
         y += layout.u(4);
-        String meta = announcement.author() + "  " + formatTime(announcement.time());
+        String meta = announcement.author() + "  " + PhoneChatThread.timeLabel(announcement.time(), false);
         if (announcement.editedAt() > 0L) {
             meta += "  " + Component.translatable("screen.bphone.phone.announcements.edited").getString();
         }
@@ -165,14 +186,11 @@ final class PhoneAnnouncementsSurfaceRenderer {
             UiRect bar = actionBar(layout);
             guiGraphics.fill(bar.left, bar.top, bar.right(), bar.bottom(), SURFACE);
             guiGraphics.fill(bar.left, bar.top, bar.right(), bar.top + 1, HAIRLINE);
-            UiRect[] buttons = actionButtons(layout);
-            renderButton(screen, guiGraphics, layout, buttons[0],
-                    Component.translatable("screen.bphone.phone.announcements.edit"), Tone.SECONDARY);
-            renderButton(screen, guiGraphics, layout, buttons[1], Component.translatable(announcement.starred()
-                    ? "screen.bphone.phone.announcements.unstar" : "screen.bphone.phone.announcements.star"), Tone.PRIMARY);
-            renderButton(screen, guiGraphics, layout, buttons[2], Component.translatable(screen.announcementDeleteConfirm > 0
-                    ? "screen.bphone.phone.announcements.delete_confirm" : "screen.bphone.phone.announcements.delete"),
-                    Tone.DANGER);
+            Component[] labels = actionLabels(screen, announcement);
+            UiRect[] buttons = actionButtons(layout, labels);
+            renderButton(screen, guiGraphics, layout, buttons[0], labels[0], Tone.SECONDARY);
+            renderButton(screen, guiGraphics, layout, buttons[1], labels[1], Tone.PRIMARY);
+            renderButton(screen, guiGraphics, layout, buttons[2], labels[2], Tone.DANGER);
         }
     }
 
@@ -192,7 +210,7 @@ final class PhoneAnnouncementsSurfaceRenderer {
             if (!manage) {
                 return true;
             }
-            UiRect[] buttons = actionButtons(layout);
+            UiRect[] buttons = actionButtons(layout, actionLabels(screen, detail));
             if (buttons[0].contains(mouseX, mouseY)) {
                 openEditor(screen, detail);
             } else if (buttons[1].contains(mouseX, mouseY)) {
@@ -259,9 +277,5 @@ final class PhoneAnnouncementsSurfaceRenderer {
 
     private static void openEditor(PhoneScreen screen, Announcement announcement) {
         Minecraft.getInstance().setScreen(new AnnouncementEditScreen(screen, announcement));
-    }
-
-    static String formatTime(long time) {
-        return new SimpleDateFormat("MM-dd HH:mm", Locale.ROOT).format(new Date(time));
     }
 }

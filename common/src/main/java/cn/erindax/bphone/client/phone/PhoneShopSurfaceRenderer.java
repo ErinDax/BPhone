@@ -290,7 +290,7 @@ final class PhoneShopSurfaceRenderer {
                 iconBounds.width - 2 * inset, iconBounds.height - 2 * inset));
 
         int textLeft = layout.rowTextLeft(row, layout.avatar);
-        int right = row.right() - layout.pad - layout.u(10);
+        int right = row.right() - layout.pad - layout.chevronReserve();
         if (trailing != null) {
             Component price = Component.literal(trailing).withStyle(BOLD);
             int priceWidth = layout.width(price, layout.bodyScale);

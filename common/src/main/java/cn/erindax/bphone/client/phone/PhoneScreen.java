@@ -1322,7 +1322,7 @@ public final class PhoneScreen extends Screen {
     private void updateLayout() {
         boolean landscape = isCameraLandscapeLayout();
         float fitScale = Math.min((float) width / FRAME_WIDTH, (float) height / FRAME_HEIGHT);
-        scale = Math.min(FRAME_SCALE, fitScale * FRAME_SCALE);
+        scale = fitScale * FRAME_SCALE;
 
         frameWidth = Math.round((landscape ? FRAME_HEIGHT : FRAME_WIDTH) * scale);
         frameHeight = Math.round((landscape ? FRAME_WIDTH : FRAME_HEIGHT) * scale);

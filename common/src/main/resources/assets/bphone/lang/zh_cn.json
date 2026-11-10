@@ -52,7 +52,7 @@
     "screen.bphone.phone.call.error.self":  "无法拨打自己的号码",
     "screen.bphone.phone.call.error.not_found":  "号码 %s 离线或不可用",
     "screen.bphone.phone.call.error.target_busy":  "%s 正在通话中",
-    "screen.bphone.phone.camera.hint_drag":  "环顾四周：左键快门",
+    "screen.bphone.phone.camera.hint_drag":  "环顾四周：左键点击快门",
     "screen.bphone.phone.camera.hint_zoom":  "缩放：鼠标滚轮",
     "screen.bphone.phone.camera.hint_capture":  "拍摄：右键",
     "screen.bphone.phone.camera.hint_exit":  "退出：Esc",
