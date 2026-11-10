@@ -186,6 +186,7 @@ final class PhoneMapSurfaceRenderer {
         renderPlayer(draw, view, layout);
         draw.flush();
         graphics.disableScissor();
+        draw.clearDepth();
 
         renderNorth(graphics, draw, layout, viewport);
         renderScale(graphics, draw, layout, viewport, app, overlayBottom(app, layout, viewport));

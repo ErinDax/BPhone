@@ -12,6 +12,19 @@ import net.minecraft.util.Mth;
 import java.util.List;
 
 final class PhoneCallSurfaceRenderer {
+    private static final String[] BACKSPACE_ICON = {
+            "....##########",
+            "...#.........#",
+            "..#..#....#..#",
+            ".#....#..#...#",
+            "#......##....#",
+            "#......##....#",
+            ".#....#..#...#",
+            "..#..#....#..#",
+            "...#.........#",
+            "....##########"
+    };
+
     private PhoneCallSurfaceRenderer() {
     }
 
@@ -67,13 +80,34 @@ final class PhoneCallSurfaceRenderer {
                     0xFFEAEBEE, 0xFFFFFFFF, 0xFF000000, screen.scale);
         }
 
-        renderDialPadButton(guiGraphics, minecraft.font, screen.getDialDeleteButtonBounds(),
-                Component.translatable("screen.bphone.phone.call.action.delete"),
-                0xFFEAEBEE, 0xFFFFFFFF, 0xFFFF3B30, screen.scale);
-        renderDialPadButton(guiGraphics, minecraft.font, screen.getDialCallButtonBounds(),
-                Component.translatable("screen.bphone.phone.call.action.call"),
-                0xFFEAEBEE, 0xFFFFFFFF, 0xFF34C759, screen.scale);
+        renderDialDeleteButton(guiGraphics, screen.getDialDeleteButtonBounds(),
+                screen.dialedNumber.isEmpty() ? 0xFFC7C7CC : 0xFF3C3C43);
+        UiRect callBounds = screen.getDialCallButtonBounds();
+        guiGraphics.blit(PhoneScreen.ANSWER_BUTTON_TEXTURE, callBounds.left, callBounds.top,
+                callBounds.width, callBounds.height, 0.0F, 0.0F, 24, 24, 24, 24);
         renderCallMenuTabs(screen, guiGraphics, true, false, false);
+    }
+
+    private static void renderDialDeleteButton(GuiGraphics guiGraphics, UiRect bounds, int color) {
+        int density = PhoneUi.pixelDensity();
+        int columns = BACKSPACE_ICON[0].length();
+        int rows = BACKSPACE_ICON.length;
+        int pixel = Math.max(1, Math.round(bounds.width * density * 0.5F / columns));
+        int left = bounds.left * density + (bounds.width * density - columns * pixel) / 2;
+        int top = bounds.top * density + (bounds.height * density - rows * pixel) / 2;
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        for (int row = 0; row < rows; row++) {
+            String line = BACKSPACE_ICON[row];
+            for (int column = 0; column < columns; column++) {
+                if (line.charAt(column) == '#') {
+                    int x = left + column * pixel;
+                    int y = top + row * pixel;
+                    guiGraphics.fill(x, y, x + pixel, y + pixel, color);
+                }
+            }
+        }
+        guiGraphics.pose().popPose();
     }
 
     static void renderCallRecentsSurface(PhoneScreen screen, GuiGraphics guiGraphics) {

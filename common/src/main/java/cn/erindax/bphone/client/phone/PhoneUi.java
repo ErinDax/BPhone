@@ -220,15 +220,23 @@ final class PhoneUi {
         int radius = Math.max(1, box.width / 4);
         if (checked) {
             fillRounded(guiGraphics, box.left, box.top, box.width, box.height, radius, ACCENT);
-            int thickness = Math.max(1, box.width / 8);
-            int x0 = box.left + box.width / 4;
-            int y0 = box.top + box.height / 2;
-            int xm = box.left + box.width * 5 / 12;
-            int ym = box.top + box.height * 2 / 3;
-            int x1 = box.left + box.width * 3 / 4;
-            int y1 = box.top + box.height / 3;
+            int density = pixelDensity();
+            float width = box.width * density;
+            float height = box.height * density;
+            int thickness = Math.max(density, Math.round(width / 8.0F));
+            int left = box.left * density - thickness / 2;
+            int top = box.top * density - thickness / 2;
+            int x0 = left + Math.round(width * 0.26F);
+            int y0 = top + Math.round(height * 0.52F);
+            int xm = left + Math.round(width * 0.43F);
+            int ym = top + Math.round(height * 0.69F);
+            int x1 = left + Math.round(width * 0.75F);
+            int y1 = top + Math.round(height * 0.33F);
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
             drawLine(guiGraphics, x0, y0, xm, ym, thickness, WHITE);
             drawLine(guiGraphics, xm, ym, x1, y1, thickness, WHITE);
+            guiGraphics.pose().popPose();
             return;
         }
         fillRounded(guiGraphics, box.left, box.top, box.width, box.height, radius, enabled ? TEXT_TERTIARY : HAIRLINE);

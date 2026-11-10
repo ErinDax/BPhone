@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
@@ -15,6 +16,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 public final class MapDraw {
     private final GuiGraphics graphics;
@@ -38,6 +40,11 @@ public final class MapDraw {
             graphics.flush();
             consumer = null;
         }
+    }
+
+    public void clearDepth() {
+        flush();
+        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
     }
 
     public void quad(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, int argb) {

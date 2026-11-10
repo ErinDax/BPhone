@@ -315,11 +315,12 @@ final class PhoneSettingsSurfaceRenderer {
             }
             int y = row.top + (row.height - layout.bodyHeight) / 2;
             int half = (row.width - 2 * layout.pad) / 2;
-            Component value = fit(layout, values[index], PLAIN, half, layout.bodyScale);
+            Component label = fit(layout, labels[index].getString(), PLAIN, half, layout.bodyScale);
+            int labelWidth = layout.width(label, layout.bodyScale);
+            Component value = fit(layout, values[index], PLAIN, row.width - 3 * layout.pad - labelWidth, layout.bodyScale);
             int valueWidth = layout.width(value, layout.bodyScale);
             drawText(guiGraphics, layout, value, row.right() - layout.pad - valueWidth, y, TEXT_SECONDARY, layout.bodyScale);
-            drawText(guiGraphics, layout, fit(layout, labels[index].getString(), PLAIN,
-                    row.width - 3 * layout.pad - valueWidth, layout.bodyScale), row.left + layout.pad, y, TEXT, layout.bodyScale);
+            drawText(guiGraphics, layout, label, row.left + layout.pad, y, TEXT, layout.bodyScale);
         }
     }
 

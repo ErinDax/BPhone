@@ -20,4 +20,11 @@ public abstract class GameRendererMixin {
 
         cir.setReturnValue(cir.getReturnValue() / Math.max(0.01F, zoomFactor));
     }
+
+    @Inject(method = "shouldRenderBlockOutline", at = @At("HEAD"), cancellable = true)
+    private void beat$hideBlockOutlineInPhoneCamera(CallbackInfoReturnable<Boolean> cir) {
+        if (PhoneClientHooks.shouldHideBlockOutline()) {
+            cir.setReturnValue(false);
+        }
+    }
 }
