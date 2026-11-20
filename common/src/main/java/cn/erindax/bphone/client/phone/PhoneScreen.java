@@ -731,11 +731,7 @@ public final class PhoneScreen extends Screen {
         }
 
         if (settingsAppMode && keyCode == InputConstants.KEY_ESCAPE) {
-            if (settingsWallpaperPage != 0) {
-                openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_MAIN);
-                return true;
-            }
-            closeSettingsApp();
+            PhoneSettingsSurfaceRenderer.back(this);
             return true;
         }
 

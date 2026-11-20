@@ -24,22 +24,55 @@ final class PhoneSettingsSurfaceRenderer {
     static final int PAGE_HOME_WALLPAPER = 2;
     static final int PAGE_ABOUT = 3;
     static final int PAGE_RINGTONE = 4;
+    static final int PAGE_DISPLAY = 5;
+    static final int PAGE_SOUND = 6;
+    static final int PAGE_CHAT = 7;
 
-    private static final int ROW_SECTION_DISPLAY = 0;
+    private static final int[] SECTIONS = {PAGE_DISPLAY, PAGE_SOUND, PAGE_CHAT, PAGE_ABOUT};
+
     private static final int ROW_LOCK_WALLPAPER = 1;
     private static final int ROW_HOME_WALLPAPER = 2;
-    private static final int ROW_SECTION_SOUND = 3;
-    private static final int ROW_SILENT = 4;
-    private static final int ROW_MESSAGE_POPUP = 5;
-    private static final int ROW_SECTION_ABOUT = 6;
-    private static final int ROW_ABOUT = 7;
-    private static final int ROW_DARK_MODE = 8;
-    private static final int ROW_RINGTONE = 9;
-    private static final int[] MAIN_ROWS = {
-            ROW_SECTION_DISPLAY, ROW_LOCK_WALLPAPER, ROW_HOME_WALLPAPER, ROW_DARK_MODE,
-            ROW_SECTION_SOUND, ROW_RINGTONE, ROW_SILENT, ROW_MESSAGE_POPUP,
-            ROW_SECTION_ABOUT, ROW_ABOUT
+    private static final int ROW_DARK_MODE = 3;
+    private static final int ROW_RINGTONE = 4;
+    private static final int ROW_SILENT = 5;
+    private static final int ROW_MESSAGE_POPUP = 6;
+    private static final int ROW_PUBLIC_KEY = 7;
+    private static final int ROW_CLOSE_AFTER_SEND = 8;
+    private static final int ROW_HIDE_VANILLA_CHAT = 9;
+    private static final int ROW_NUMBER = 10;
+    private static final int ROW_MODEL = 11;
+    private static final int ROW_PHOTOS = 12;
+    private static final int ROW_VERSION = 13;
+    private static final int GROUP_WALLPAPER = 101;
+    private static final int GROUP_APPEARANCE = 102;
+    private static final int GROUP_CALLS = 103;
+    private static final int GROUP_MESSAGES = 104;
+    private static final int GROUP_PUBLIC = 105;
+    private static final int GROUP_VANILLA = 106;
+    private static final int GROUP_DEVICE = 107;
+    private static final int NOTE_CHAT = 201;
+
+    private static final int[] DISPLAY_ENTRIES = {
+            GROUP_WALLPAPER, ROW_LOCK_WALLPAPER, ROW_HOME_WALLPAPER, GROUP_APPEARANCE, ROW_DARK_MODE
     };
+    private static final int[] SOUND_ENTRIES = {
+            GROUP_CALLS, ROW_RINGTONE, ROW_SILENT, GROUP_MESSAGES, ROW_MESSAGE_POPUP
+    };
+    private static final int[] CHAT_ENTRIES = {
+            GROUP_PUBLIC, ROW_PUBLIC_KEY, ROW_CLOSE_AFTER_SEND, GROUP_VANILLA, ROW_HIDE_VANILLA_CHAT, NOTE_CHAT
+    };
+    private static final int[] ABOUT_ENTRIES = {
+            GROUP_DEVICE, ROW_NUMBER, ROW_MODEL, ROW_PHOTOS, ROW_VERSION
+    };
+    private static final int[] NO_ENTRIES = {};
+
+    private static final int TYPE_GROUP = 0;
+    private static final int TYPE_ROW = 1;
+    private static final int TYPE_NOTE = 2;
+
+    private static final int CONTROL_NAVIGATION = 0;
+    private static final int CONTROL_TOGGLE = 1;
+    private static final int CONTROL_VALUE = 2;
 
     private static final int MENU_LOCK = 0;
     private static final int MENU_HOME = 1;
@@ -51,7 +84,7 @@ final class PhoneSettingsSurfaceRenderer {
     private static final int IMPORT_CELL = 0;
     private static final int FIRST_OPTION_CELL = 1;
 
-    private record Row(int kind, UiRect rect) {
+    private record Item(int type, int id, UiRect rect, boolean first, boolean last) {
     }
 
     private PhoneSettingsSurfaceRenderer() {
@@ -61,27 +94,34 @@ final class PhoneSettingsSurfaceRenderer {
         PhoneChatLayout layout = new PhoneChatLayout(screen);
         UiRect surface = layout.surface;
         guiGraphics.fill(surface.left, surface.top, surface.right(), surface.bottom(), PAGE);
-        switch (screen.settingsWallpaperPage) {
+        int page = screen.settingsWallpaperPage;
+        switch (page) {
             case PAGE_LOCK_WALLPAPER -> renderWallpaperPicker(screen, guiGraphics, layout, true);
             case PAGE_HOME_WALLPAPER -> renderWallpaperPicker(screen, guiGraphics, layout, false);
-            case PAGE_ABOUT -> renderAbout(screen, guiGraphics, layout);
             case PAGE_RINGTONE -> renderRingtones(screen, guiGraphics, layout);
-            default -> renderMain(screen, guiGraphics, layout);
+            case PAGE_MAIN -> renderHome(screen, guiGraphics, layout);
+            default -> renderSectionPage(screen, guiGraphics, layout, page);
+        }
+    }
+
+    static void back(PhoneScreen screen) {
+        switch (screen.settingsWallpaperPage) {
+            case PAGE_MAIN -> screen.closeSettingsApp();
+            case PAGE_LOCK_WALLPAPER, PAGE_HOME_WALLPAPER -> screen.openSettingsPage(PAGE_DISPLAY);
+            case PAGE_RINGTONE -> screen.openSettingsPage(PAGE_SOUND);
+            default -> screen.openSettingsPage(PAGE_MAIN);
         }
     }
 
     static boolean handleClick(PhoneScreen screen, double mouseX, double mouseY) {
         PhoneChatLayout layout = new PhoneChatLayout(screen);
+        int page = screen.settingsWallpaperPage;
         if (layout.backButton(layout.header()).contains(mouseX, mouseY)) {
-            if (screen.settingsWallpaperPage == PAGE_MAIN) {
-                screen.closeSettingsApp();
-            } else {
-                screen.openSettingsPage(PAGE_MAIN);
-            }
+            back(screen);
             return true;
         }
 
-        if (isWallpaperPage(screen.settingsWallpaperPage)) {
+        if (isWallpaperPage(page)) {
             List<String> options = wallpaperOptions(screen);
             UiRect viewport = pickerViewport(layout);
             if (!viewport.contains(mouseX, mouseY)) {
@@ -95,15 +135,15 @@ final class PhoneSettingsSurfaceRenderer {
             }
             for (int index = 0; index < options.size(); index++) {
                 if (pickerCell(layout, FIRST_OPTION_CELL + index, screen.settingsPickerScroll).contains(mouseX, mouseY)) {
-                    screen.applyPhoneSetting(wallpaperSettingKey(screen.settingsWallpaperPage), options.get(index));
-                    screen.openSettingsPage(PAGE_MAIN);
+                    screen.applyPhoneSetting(wallpaperSettingKey(page), options.get(index));
+                    screen.openSettingsPage(PAGE_DISPLAY);
                     return true;
                 }
             }
             return true;
         }
 
-        if (screen.settingsWallpaperPage == PAGE_RINGTONE) {
+        if (page == PAGE_RINGTONE) {
             List<String> ringtones = PhoneSettingsData.RINGTONES;
             for (int index = 0; index < ringtones.size(); index++) {
                 if (ringtoneRow(layout, index).contains(mouseX, mouseY)) {
@@ -115,42 +155,47 @@ final class PhoneSettingsSurfaceRenderer {
             return true;
         }
 
-        if (screen.settingsWallpaperPage != PAGE_MAIN) {
-            return true;
-        }
-
-        ItemStack phoneStack = screen.getSettingsPhoneStack();
-        for (Row row : mainRows(layout)) {
-            if (!row.rect().contains(mouseX, mouseY)) {
-                continue;
-            }
-            switch (row.kind()) {
-                case ROW_LOCK_WALLPAPER -> screen.openSettingsPage(PAGE_LOCK_WALLPAPER);
-                case ROW_HOME_WALLPAPER -> screen.openSettingsPage(PAGE_HOME_WALLPAPER);
-                case ROW_DARK_MODE -> screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE,
-                        PhoneSettingsData.flagValue(!PhoneSettingsData.isDarkMode(phoneStack)));
-                case ROW_RINGTONE -> screen.openSettingsPage(PAGE_RINGTONE);
-                case ROW_SILENT -> screen.applyPhoneSetting(PhoneSettingsData.KEY_SILENT,
-                        PhoneSettingsData.flagValue(!PhoneSettingsData.isSilent(phoneStack)));
-                case ROW_MESSAGE_POPUP -> screen.applyPhoneSetting(PhoneSettingsData.KEY_MESSAGE_POPUP,
-                        PhoneSettingsData.flagValue(!PhoneSettingsData.isMessagePopupEnabled(phoneStack)));
-                case ROW_ABOUT -> screen.openSettingsPage(PAGE_ABOUT);
-                default -> {
+        if (page == PAGE_MAIN) {
+            for (int index = 0; index < SECTIONS.length; index++) {
+                if (homeCard(layout, index).contains(mouseX, mouseY)) {
+                    screen.openSettingsPage(SECTIONS[index]);
+                    return true;
                 }
             }
             return true;
+        }
+
+        for (int index = 0; index < SECTIONS.length; index++) {
+            if (chip(layout, index).contains(mouseX, mouseY)) {
+                if (SECTIONS[index] != page) {
+                    screen.openSettingsPage(SECTIONS[index]);
+                }
+                return true;
+            }
+        }
+        if (!sectionViewport(layout).contains(mouseX, mouseY)) {
+            return true;
+        }
+        for (Item item : items(screen, layout, page, screen.settingsPickerScroll)) {
+            if (item.type() == TYPE_ROW && item.rect().contains(mouseX, mouseY)) {
+                activate(screen, item.id());
+                return true;
+            }
         }
         return true;
     }
 
     static void scroll(PhoneScreen screen, double scrollY) {
-        if (!isWallpaperPage(screen.settingsWallpaperPage)) {
+        int page = screen.settingsWallpaperPage;
+        if (page == PAGE_MAIN || page == PAGE_RINGTONE) {
             return;
         }
         PhoneChatLayout layout = new PhoneChatLayout(screen);
         int delta = -(int) Math.signum(scrollY) * layout.scrollStep;
-        screen.settingsPickerScroll = Mth.clamp(screen.settingsPickerScroll + delta, 0,
-                pickerMaxScroll(layout, wallpaperOptions(screen).size()));
+        int limit = isWallpaperPage(page)
+                ? pickerMaxScroll(layout, wallpaperOptions(screen).size())
+                : sectionMaxScroll(screen, layout, page);
+        screen.settingsPickerScroll = Mth.clamp(screen.settingsPickerScroll + delta, 0, limit);
     }
 
     static void handleFilesDrop(PhoneScreen screen, List<Path> paths) {
@@ -212,71 +257,210 @@ final class PhoneSettingsSurfaceRenderer {
         return true;
     }
 
-    private static void renderMain(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout) {
+    private static void renderHome(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout) {
         renderHeader(screen, guiGraphics, layout, layout.header(),
                 Component.translatable("screen.bphone.phone.title.settings"), true, false);
-        ItemStack phoneStack = screen.getSettingsPhoneStack();
-        UiRect surface = layout.surface;
-        guiGraphics.enableScissor(surface.left, layout.header().bottom(), surface.right(), surface.bottom());
-        for (Row row : mainRows(layout)) {
-            UiRect rect = row.rect();
-            switch (row.kind()) {
-                case ROW_SECTION_DISPLAY -> renderSection(guiGraphics, layout, rect,
-                        Component.translatable("screen.bphone.phone.settings.section.display").getString());
-                case ROW_SECTION_SOUND -> renderSection(guiGraphics, layout, rect,
-                        Component.translatable("screen.bphone.phone.settings.section.sound").getString());
-                case ROW_SECTION_ABOUT -> renderSection(guiGraphics, layout, rect,
-                        Component.translatable("screen.bphone.phone.settings.section.about").getString());
-                case ROW_LOCK_WALLPAPER -> {
-                    guiGraphics.fill(rect.left, rect.top, rect.right(), rect.bottom(), SURFACE);
-                    renderNavigationRow(screen, guiGraphics, layout, rect,
-                            Component.translatable("screen.bphone.phone.settings.lock_wallpaper"),
-                            wallpaperName(PhoneWallpaperData.getLockWallpaper(phoneStack)).getString());
-                    guiGraphics.fill(rect.left + layout.pad, rect.bottom() - 1, rect.right(), rect.bottom(), HAIRLINE);
-                }
-                case ROW_HOME_WALLPAPER -> {
-                    guiGraphics.fill(rect.left, rect.top, rect.right(), rect.bottom(), SURFACE);
-                    renderNavigationRow(screen, guiGraphics, layout, rect,
-                            Component.translatable("screen.bphone.phone.settings.home_wallpaper"),
-                            wallpaperName(PhoneWallpaperData.getHomeWallpaper(phoneStack)).getString());
-                    guiGraphics.fill(rect.left + layout.pad, rect.bottom() - 1, rect.right(), rect.bottom(), HAIRLINE);
-                }
-                case ROW_DARK_MODE -> {
-                    guiGraphics.fill(rect.left, rect.top, rect.right(), rect.bottom(), SURFACE);
-                    renderToggleRow(screen, guiGraphics, layout, rect,
-                            Component.translatable("screen.bphone.phone.settings.dark_mode"),
-                            PhoneSettingsData.isDarkMode(phoneStack));
-                }
-                case ROW_RINGTONE -> {
-                    guiGraphics.fill(rect.left, rect.top, rect.right(), rect.bottom(), SURFACE);
-                    renderNavigationRow(screen, guiGraphics, layout, rect,
-                            Component.translatable("screen.bphone.phone.settings.ringtone"),
-                            PhoneRingtones.name(PhoneSettingsData.getRingtone(phoneStack)).getString());
-                    guiGraphics.fill(rect.left + layout.pad, rect.bottom() - 1, rect.right(), rect.bottom(), HAIRLINE);
-                }
-                case ROW_SILENT -> {
-                    guiGraphics.fill(rect.left, rect.top, rect.right(), rect.bottom(), SURFACE);
-                    renderToggleRow(screen, guiGraphics, layout, rect,
-                            Component.translatable("screen.bphone.phone.settings.silent"),
-                            PhoneSettingsData.isSilent(phoneStack));
-                    guiGraphics.fill(rect.left + layout.pad, rect.bottom() - 1, rect.right(), rect.bottom(), HAIRLINE);
-                }
-                case ROW_MESSAGE_POPUP -> {
-                    guiGraphics.fill(rect.left, rect.top, rect.right(), rect.bottom(), SURFACE);
-                    renderToggleRow(screen, guiGraphics, layout, rect,
-                            Component.translatable("screen.bphone.phone.settings.message_popup"),
-                            PhoneSettingsData.isMessagePopupEnabled(phoneStack));
-                }
-                case ROW_ABOUT -> {
-                    guiGraphics.fill(rect.left, rect.top, rect.right(), rect.bottom(), SURFACE);
-                    renderNavigationRow(screen, guiGraphics, layout, rect,
-                            Component.translatable("screen.bphone.phone.settings.about"), null);
-                }
-                default -> {
-                }
+        for (int index = 0; index < SECTIONS.length; index++) {
+            UiRect card = homeCard(layout, index);
+            int background = hovered(screen, card) ? ACCENT_SOFT : SURFACE;
+            fillRounded(guiGraphics, card.left, card.top, card.width, card.height, cardRadius(layout), background);
+            int icon = even(Math.max(layout.u(18), card.width / 3));
+            int top = card.top + (card.height - icon - layout.gap - layout.bodyHeight) / 2;
+            renderSectionIcon(guiGraphics, SECTIONS[index],
+                    new UiRect(card.left + (card.width - icon) / 2, top, icon, icon), ACCENT, background);
+            Component label = fit(layout, Component.translatable(sectionKey(SECTIONS[index])).getString(), BOLD,
+                    card.width - 2 * layout.u(3), layout.bodyScale);
+            drawCentered(guiGraphics, layout, label, card.left + card.width / 2, top + icon + layout.gap, TEXT,
+                    layout.bodyScale);
+        }
+    }
+
+    private static void renderSectionPage(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout,
+                                          int page) {
+        renderHeader(screen, guiGraphics, layout, layout.header(), Component.translatable(sectionKey(page)), true,
+                false);
+        for (int index = 0; index < SECTIONS.length; index++) {
+            UiRect chip = chip(layout, index);
+            boolean selected = SECTIONS[index] == page;
+            if (selected) {
+                fillRounded(guiGraphics, chip.left, chip.top, chip.width, chip.height, chip.height / 2, ACCENT);
+            } else if (hovered(screen, chip)) {
+                fillRounded(guiGraphics, chip.left, chip.top, chip.width, chip.height, chip.height / 2, SECONDARY_HOVER);
+            }
+            Component label = fit(layout, Component.translatable(tabKey(SECTIONS[index])).getString(),
+                    selected ? BOLD : PLAIN, chip.width - 2 * layout.u(2), layout.bodyScale);
+            drawCentered(guiGraphics, layout, label, chip.left + chip.width / 2,
+                    chip.top + (chip.height - layout.bodyHeight) / 2, selected ? WHITE : TEXT_SECONDARY,
+                    layout.bodyScale);
+        }
+
+        UiRect viewport = sectionViewport(layout);
+        screen.settingsPickerScroll = Mth.clamp(screen.settingsPickerScroll, 0, sectionMaxScroll(screen, layout, page));
+        boolean pointerInside = hovered(screen, viewport);
+        guiGraphics.enableScissor(viewport.left, viewport.top, viewport.right(), viewport.bottom());
+        for (Item item : items(screen, layout, page, screen.settingsPickerScroll)) {
+            UiRect rect = item.rect();
+            if (rect.bottom() <= viewport.top || rect.top >= viewport.bottom()) {
+                continue;
+            }
+            switch (item.type()) {
+                case TYPE_GROUP -> renderGroup(guiGraphics, layout, rect, item.id());
+                case TYPE_NOTE -> drawWrapped(guiGraphics, layout, Component.translatable(key(item.id())),
+                        rect.left + layout.u(2), rect.top, rect.width - 2 * layout.u(2), TEXT_TERTIARY,
+                        layout.captionScale);
+                default -> renderRow(screen, guiGraphics, layout, item, pointerInside);
             }
         }
         guiGraphics.disableScissor();
+    }
+
+    private static void renderGroup(GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect rect, int group) {
+        Component title = fit(layout, Component.translatable(key(group)).getString(), BOLD,
+                rect.width - 2 * layout.u(2), layout.captionScale);
+        drawText(guiGraphics, layout, title, rect.left + layout.u(2),
+                rect.top + (rect.height - 1 - layout.captionHeight) / 2, TEXT_SECONDARY, layout.captionScale);
+        guiGraphics.fill(rect.left, rect.bottom() - 1, rect.right(), rect.bottom(),
+                (TEXT_TERTIARY & 0x00FFFFFF) | 0x66000000);
+    }
+
+    private static void renderRow(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout, Item item,
+                                  boolean pointerInside) {
+        UiRect rect = item.rect();
+        int row = item.id();
+        int control = control(row);
+        boolean hover = control != CONTROL_VALUE && pointerInside && hovered(screen, rect);
+        int radius = Math.min(cardRadius(layout), rect.height / 2);
+        int background = hover ? HOVER : SURFACE;
+        fillRounded(guiGraphics, rect.left, rect.top, rect.width, rect.height, radius, background);
+        if (!item.first()) {
+            guiGraphics.fill(rect.left, rect.top, rect.right(), rect.top + radius, background);
+        }
+        if (!item.last()) {
+            guiGraphics.fill(rect.left, rect.bottom() - radius, rect.right(), rect.bottom(), background);
+        }
+
+        int left = rect.left + layout.pad;
+        int right = rect.right() - layout.pad;
+        int inner = right - left;
+        int top = rect.top + rowPad(layout);
+        Component title = title(row);
+        int titleWidth = titleWidth(screen, layout, row, inner);
+        int titleHeight = wrappedHeight(layout, title, titleWidth, layout.bodyScale);
+        Component value = valueText(screen, layout, row, inner);
+        int valueWidth = layout.width(value, layout.bodyScale);
+        if (control == CONTROL_VALUE) {
+            int head = Math.max(titleHeight, layout.bodyHeight);
+            drawWrapped(guiGraphics, layout, title, left, top + (head - titleHeight) / 2, titleWidth, TEXT,
+                    layout.bodyScale);
+            drawText(guiGraphics, layout, value, right - valueWidth, top + (head - layout.bodyHeight) / 2,
+                    TEXT_SECONDARY, layout.bodyScale);
+        } else {
+            drawWrapped(guiGraphics, layout, title, left, top, titleWidth, TEXT, layout.bodyScale);
+            drawWrapped(guiGraphics, layout, description(row), left, top + titleHeight + layout.textGap, inner,
+                    TEXT_SECONDARY, layout.captionScale);
+            int controlHeight = switchHeight(layout);
+            int controlTop = rect.bottom() - rowPad(layout) - controlHeight;
+            if (control == CONTROL_TOGGLE) {
+                renderSwitch(guiGraphics, layout, right - switchWidth(layout), controlTop, enabled(screen, row));
+            } else {
+                int centerY = controlTop + controlHeight / 2;
+                renderArrow(guiGraphics, layout, right, centerY);
+                drawText(guiGraphics, layout, value, right - layout.chevronReserve() - valueWidth,
+                        centerY - layout.bodyHeight / 2, TEXT_SECONDARY, layout.bodyScale);
+            }
+        }
+        if (!item.last()) {
+            guiGraphics.fill(left, rect.bottom() - 1, rect.right(), rect.bottom(), HAIRLINE);
+        }
+    }
+
+    private static void renderSwitch(GuiGraphics guiGraphics, PhoneChatLayout layout, int left, int top,
+                                     boolean enabled) {
+        int height = switchHeight(layout);
+        int width = switchWidth(layout);
+        fillRounded(guiGraphics, left, top, width, height, height / 2, enabled ? ACCENT : SECONDARY_HOVER);
+        int knob = height - 2;
+        fillRounded(guiGraphics, enabled ? left + width - knob - 1 : left + 1, top + 1, knob, knob, knob / 2, WHITE);
+    }
+
+    private static void renderArrow(GuiGraphics guiGraphics, PhoneChatLayout layout, int right, int centerY) {
+        int arm = layout.chevronArm();
+        int left = right - arm - 1;
+        for (int step = 0; step <= arm; step++) {
+            guiGraphics.fill(left + step, centerY - arm + step, left + step + 1, centerY - arm + step + 1,
+                    TEXT_TERTIARY);
+            guiGraphics.fill(left + step, centerY + arm - step, left + step + 1, centerY + arm - step + 1,
+                    TEXT_TERTIARY);
+        }
+    }
+
+    private static void renderSectionIcon(GuiGraphics guiGraphics, int page, UiRect box, int color,
+                                          int background) {
+        switch (page) {
+            case PAGE_DISPLAY -> renderSlidersIcon(guiGraphics, box, color, background);
+            case PAGE_SOUND -> renderBellIcon(guiGraphics, box, color);
+            case PAGE_CHAT -> renderBubbleIcon(guiGraphics, box, color, background);
+            default -> renderInfoIcon(guiGraphics, box, color, background);
+        }
+    }
+
+    private static void renderSlidersIcon(GuiGraphics guiGraphics, UiRect box, int color, int background) {
+        int stroke = Math.max(2, box.width / 11);
+        int knob = even(stroke * 3);
+        int halo = knob + 2 * Math.max(1, stroke / 2);
+        int[] centers = {
+                box.left + box.width * 2 / 3, box.left + box.width / 3, box.left + box.width * 3 / 5
+        };
+        for (int line = 0; line < 3; line++) {
+            int centerY = box.top + box.height * (1 + 2 * line) / 6;
+            guiGraphics.fill(box.left, centerY - stroke / 2, box.right(), centerY - stroke / 2 + stroke, color);
+            fillRounded(guiGraphics, centers[line] - halo / 2, centerY - halo / 2, halo, halo, halo / 2, background);
+            fillRounded(guiGraphics, centers[line] - knob / 2, centerY - knob / 2, knob, knob, knob / 2, color);
+        }
+    }
+
+    private static void renderBellIcon(GuiGraphics guiGraphics, UiRect box, int color) {
+        int knob = even(Math.max(2, box.width / 8));
+        int clapper = even(Math.max(2, box.width / 6));
+        int brim = Math.max(1, box.height / 10);
+        int flare = Math.max(1, box.width / 10);
+        int width = even(Math.round(box.width * 0.62F));
+        int centerX = box.left + box.width / 2;
+        int left = centerX - width / 2;
+        int top = box.top + knob / 2;
+        int bottom = box.bottom() - clapper / 2 - 1;
+        fillRounded(guiGraphics, centerX - knob / 2, box.top, knob, knob, knob / 2, color);
+        fillRounded(guiGraphics, left, top, width, bottom - top, width / 2, color);
+        guiGraphics.fill(left, top + width / 2, left + width, bottom, color);
+        guiGraphics.fill(left - flare, bottom - brim, left + width + flare, bottom, color);
+        fillRounded(guiGraphics, centerX - clapper / 2, bottom + 1, clapper, clapper / 2, clapper / 4, color);
+    }
+
+    private static void renderBubbleIcon(GuiGraphics guiGraphics, UiRect box, int color, int background) {
+        int tail = Math.max(2, box.height / 6);
+        int height = even(Math.round(box.height * 0.72F));
+        int top = box.top + (box.height - height - tail) / 2;
+        fillRounded(guiGraphics, box.left, top, box.width, height, Math.max(2, box.width / 4), color);
+        int tailLeft = box.left + box.width / 5;
+        for (int row = 0; row < tail; row++) {
+            guiGraphics.fill(tailLeft, top + height + row, tailLeft + 2 * (tail - row) - 1, top + height + row + 1,
+                    color);
+        }
+        int dot = even(Math.max(2, box.width / 9));
+        int dotTop = top + (height - dot) / 2;
+        int dotLeft = box.left + (box.width - dot) / 2;
+        for (int index = -1; index <= 1; index++) {
+            fillRounded(guiGraphics, dotLeft + index * 2 * dot, dotTop, dot, dot, dot / 2, background);
+        }
+    }
+
+    private static void renderInfoIcon(GuiGraphics guiGraphics, UiRect box, int color, int background) {
+        fillRounded(guiGraphics, box.left, box.top, box.width, box.height, box.width / 2, color);
+        int stem = even(Math.max(2, box.width / 9));
+        int left = box.left + (box.width - stem) / 2;
+        fillRounded(guiGraphics, left, box.top + Math.round(box.height * 0.22F), stem, stem, stem / 2, background);
+        guiGraphics.fill(left, box.top + Math.round(box.height * 0.42F), left + stem,
+                box.top + Math.round(box.height * 0.78F), background);
     }
 
     private static void renderWallpaperPicker(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout,
@@ -336,41 +520,6 @@ final class PhoneSettingsSurfaceRenderer {
                 layout.captionScale);
     }
 
-    private static void renderAbout(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout) {
-        renderHeader(screen, guiGraphics, layout, layout.header(),
-                Component.translatable("screen.bphone.phone.settings.about"), true, false);
-        ItemStack phoneStack = screen.getSettingsPhoneStack();
-        String version = Platform.getMod(BPhone.MOD_ID).getVersion();
-        Component[] labels = {
-                Component.translatable("screen.bphone.phone.settings.about.number"),
-                Component.translatable("screen.bphone.phone.settings.about.model"),
-                Component.translatable("screen.bphone.phone.settings.about.photos"),
-                Component.translatable("screen.bphone.phone.settings.about.version")
-        };
-        String[] values = {
-                screen.getOwnPhoneNumber(),
-                phoneStack.isEmpty() ? "-" : phoneStack.getHoverName().getString(),
-                screen.getPhotoCount() + " / " + screen.getMaxPhotoCount(),
-                "BPhone " + version
-        };
-        int top = layout.header().bottom() + layout.sectionGap;
-        for (int index = 0; index < labels.length; index++) {
-            UiRect row = new UiRect(layout.surface.left, top + index * layout.itemHeight, layout.surface.width, layout.itemHeight);
-            guiGraphics.fill(row.left, row.top, row.right(), row.bottom(), SURFACE);
-            if (index < labels.length - 1) {
-                guiGraphics.fill(row.left + layout.pad, row.bottom() - 1, row.right(), row.bottom(), HAIRLINE);
-            }
-            int y = row.top + (row.height - layout.bodyHeight) / 2;
-            int half = (row.width - 2 * layout.pad) / 2;
-            Component label = fit(layout, labels[index].getString(), PLAIN, half, layout.bodyScale);
-            int labelWidth = layout.width(label, layout.bodyScale);
-            Component value = fit(layout, values[index], PLAIN, row.width - 3 * layout.pad - labelWidth, layout.bodyScale);
-            int valueWidth = layout.width(value, layout.bodyScale);
-            drawText(guiGraphics, layout, value, row.right() - layout.pad - valueWidth, y, TEXT_SECONDARY, layout.bodyScale);
-            drawText(guiGraphics, layout, label, row.left + layout.pad, y, TEXT, layout.bodyScale);
-        }
-    }
-
     private static void renderRingtones(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout) {
         renderHeader(screen, guiGraphics, layout, layout.header(),
                 Component.translatable("screen.bphone.phone.settings.ringtone"), true, false);
@@ -404,16 +553,235 @@ final class PhoneSettingsSurfaceRenderer {
         return new UiRect(layout.surface.left, top, layout.surface.width, layout.itemHeight);
     }
 
-    private static List<Row> mainRows(PhoneChatLayout layout) {
-        List<Row> rows = new ArrayList<>(MAIN_ROWS.length);
-        int y = layout.header().bottom();
-        for (int kind : MAIN_ROWS) {
-            boolean section = kind == ROW_SECTION_DISPLAY || kind == ROW_SECTION_SOUND || kind == ROW_SECTION_ABOUT;
-            int height = section ? layout.sectionHeight + layout.u(2) : layout.itemHeight;
-            rows.add(new Row(kind, new UiRect(layout.surface.left, y, layout.surface.width, height)));
-            y += height;
+    private static UiRect homeCard(PhoneChatLayout layout, int index) {
+        int gap = layout.gap + layout.u(2);
+        int width = (layout.surface.width - 2 * layout.pad - gap) / 2;
+        int height = Math.round(width * 0.9F);
+        int left = layout.surface.left + layout.pad + (index % 2) * (width + gap);
+        int top = layout.header().bottom() + layout.pad + (index / 2) * (height + gap);
+        return new UiRect(left, top, width, height);
+    }
+
+    private static UiRect chip(PhoneChatLayout layout, int index) {
+        int gap = layout.u(2);
+        int available = layout.surface.width - 2 * layout.pad;
+        int width = (available - (SECTIONS.length - 1) * gap) / SECTIONS.length;
+        return new UiRect(layout.surface.left + layout.pad + index * (width + gap),
+                layout.header().bottom() + layout.gap, width, layout.bodyHeight + 2 * layout.u(4));
+    }
+
+    private static UiRect sectionViewport(PhoneChatLayout layout) {
+        int top = chip(layout, 0).bottom() + layout.gap;
+        return new UiRect(layout.surface.left, top, layout.surface.width, Math.max(1, layout.surface.bottom() - top));
+    }
+
+    private static List<Item> items(PhoneScreen screen, PhoneChatLayout layout, int page, int scroll) {
+        int[] entries = entries(page);
+        List<Item> items = new ArrayList<>(entries.length);
+        UiRect viewport = sectionViewport(layout);
+        int left = viewport.left + layout.pad;
+        int width = viewport.width - 2 * layout.pad;
+        int y = viewport.top - scroll;
+        for (int index = 0; index < entries.length; index++) {
+            int id = entries[index];
+            if (isRow(id)) {
+                int height = rowHeight(screen, layout, id, width - 2 * layout.pad);
+                boolean first = index == 0 || !isRow(entries[index - 1]);
+                boolean last = index == entries.length - 1 || !isRow(entries[index + 1]);
+                items.add(new Item(TYPE_ROW, id, new UiRect(left, y, width, height), first, last));
+                y += height;
+            } else if (id == NOTE_CHAT) {
+                y += layout.gap;
+                int height = wrappedHeight(layout, Component.translatable(key(id)), width - 2 * layout.u(2),
+                        layout.captionScale);
+                items.add(new Item(TYPE_NOTE, id, new UiRect(left, y, width, height), false, false));
+                y += height;
+            } else {
+                if (index > 0) {
+                    y += layout.gap;
+                }
+                items.add(new Item(TYPE_GROUP, id, new UiRect(left, y, width, layout.sectionHeight), false, false));
+                y += layout.sectionHeight + layout.u(3);
+            }
         }
-        return rows;
+        return items;
+    }
+
+    private static int sectionMaxScroll(PhoneScreen screen, PhoneChatLayout layout, int page) {
+        List<Item> items = items(screen, layout, page, 0);
+        if (items.isEmpty()) {
+            return 0;
+        }
+        UiRect viewport = sectionViewport(layout);
+        return PhoneChatLayout.maxScroll(viewport,
+                items.get(items.size() - 1).rect().bottom() + layout.pad - viewport.top);
+    }
+
+    private static int rowHeight(PhoneScreen screen, PhoneChatLayout layout, int row, int inner) {
+        int titleHeight = wrappedHeight(layout, title(row), titleWidth(screen, layout, row, inner), layout.bodyScale);
+        if (control(row) == CONTROL_VALUE) {
+            return 2 * rowPad(layout) + Math.max(titleHeight, layout.bodyHeight);
+        }
+        return 2 * rowPad(layout) + titleHeight + layout.textGap
+                + wrappedHeight(layout, description(row), inner, layout.captionScale)
+                + layout.gap + switchHeight(layout);
+    }
+
+    private static int titleWidth(PhoneScreen screen, PhoneChatLayout layout, int row, int inner) {
+        if (control(row) != CONTROL_VALUE) {
+            return inner;
+        }
+        return Math.max(layout.u(20),
+                inner - layout.gap - layout.width(valueText(screen, layout, row, inner), layout.bodyScale));
+    }
+
+    private static Component valueText(PhoneScreen screen, PhoneChatLayout layout, int row, int inner) {
+        int room = control(row) == CONTROL_VALUE
+                ? Math.max(inner / 2, inner - layout.gap - layout.width(title(row), layout.bodyScale))
+                : inner - layout.chevronReserve();
+        return fit(layout, value(screen, row), PLAIN, room, layout.bodyScale);
+    }
+
+    private static int switchHeight(PhoneChatLayout layout) {
+        return Math.max(layout.u(10), layout.bodyHeight + layout.u(2));
+    }
+
+    private static int switchWidth(PhoneChatLayout layout) {
+        int height = switchHeight(layout);
+        return Math.max(height + layout.u(8), Math.round(height * 1.8F));
+    }
+
+    private static int rowPad(PhoneChatLayout layout) {
+        return layout.u(6);
+    }
+
+    private static int cardRadius(PhoneChatLayout layout) {
+        return Math.max(2, layout.radius * 2);
+    }
+
+    private static int even(int value) {
+        return value % 2 == 0 ? value : value + 1;
+    }
+
+    private static int[] entries(int page) {
+        return switch (page) {
+            case PAGE_DISPLAY -> DISPLAY_ENTRIES;
+            case PAGE_SOUND -> SOUND_ENTRIES;
+            case PAGE_CHAT -> CHAT_ENTRIES;
+            case PAGE_ABOUT -> ABOUT_ENTRIES;
+            default -> NO_ENTRIES;
+        };
+    }
+
+    private static boolean isRow(int id) {
+        return id < GROUP_WALLPAPER;
+    }
+
+    private static int control(int row) {
+        return switch (row) {
+            case ROW_LOCK_WALLPAPER, ROW_HOME_WALLPAPER, ROW_RINGTONE -> CONTROL_NAVIGATION;
+            case ROW_NUMBER, ROW_MODEL, ROW_PHOTOS, ROW_VERSION -> CONTROL_VALUE;
+            default -> CONTROL_TOGGLE;
+        };
+    }
+
+    private static String key(int id) {
+        return "screen.bphone.phone.settings." + switch (id) {
+            case ROW_LOCK_WALLPAPER -> "lock_wallpaper";
+            case ROW_HOME_WALLPAPER -> "home_wallpaper";
+            case ROW_DARK_MODE -> "dark_mode";
+            case ROW_RINGTONE -> "ringtone";
+            case ROW_SILENT -> "silent";
+            case ROW_MESSAGE_POPUP -> "message_popup";
+            case ROW_PUBLIC_KEY -> "public_key";
+            case ROW_CLOSE_AFTER_SEND -> "close_after_send";
+            case ROW_HIDE_VANILLA_CHAT -> "hide_vanilla_chat";
+            case ROW_NUMBER -> "about.number";
+            case ROW_MODEL -> "about.model";
+            case ROW_PHOTOS -> "about.photos";
+            case ROW_VERSION -> "about.version";
+            case GROUP_WALLPAPER -> "group.wallpaper";
+            case GROUP_APPEARANCE -> "group.appearance";
+            case GROUP_CALLS -> "group.calls";
+            case GROUP_MESSAGES -> "group.messages";
+            case GROUP_PUBLIC -> "group.public";
+            case GROUP_VANILLA -> "group.vanilla";
+            case GROUP_DEVICE -> "group.device";
+            default -> "chat.note";
+        };
+    }
+
+    private static Component title(int row) {
+        return Component.translatable(key(row)).withStyle(BOLD);
+    }
+
+    private static Component description(int row) {
+        return Component.translatable(key(row) + ".desc");
+    }
+
+    private static String sectionKey(int page) {
+        return switch (page) {
+            case PAGE_DISPLAY -> "screen.bphone.phone.settings.section.display";
+            case PAGE_SOUND -> "screen.bphone.phone.settings.section.sound";
+            case PAGE_CHAT -> "screen.bphone.phone.settings.section.chat";
+            default -> "screen.bphone.phone.settings.about";
+        };
+    }
+
+    private static String tabKey(int page) {
+        return switch (page) {
+            case PAGE_DISPLAY -> "screen.bphone.phone.settings.tab.display";
+            case PAGE_SOUND -> "screen.bphone.phone.settings.tab.sound";
+            case PAGE_CHAT -> "screen.bphone.phone.settings.tab.chat";
+            default -> "screen.bphone.phone.settings.tab.about";
+        };
+    }
+
+    private static String value(PhoneScreen screen, int row) {
+        ItemStack phoneStack = screen.getSettingsPhoneStack();
+        return switch (row) {
+            case ROW_LOCK_WALLPAPER -> wallpaperName(PhoneWallpaperData.getLockWallpaper(phoneStack)).getString();
+            case ROW_HOME_WALLPAPER -> wallpaperName(PhoneWallpaperData.getHomeWallpaper(phoneStack)).getString();
+            case ROW_RINGTONE -> PhoneRingtones.name(PhoneSettingsData.getRingtone(phoneStack)).getString();
+            case ROW_NUMBER -> screen.getOwnPhoneNumber();
+            case ROW_MODEL -> phoneStack.isEmpty() ? "-" : phoneStack.getHoverName().getString();
+            case ROW_PHOTOS -> screen.getPhotoCount() + " / " + screen.getMaxPhotoCount();
+            case ROW_VERSION -> "BPhone " + Platform.getMod(BPhone.MOD_ID).getVersion();
+            default -> "";
+        };
+    }
+
+    private static boolean enabled(PhoneScreen screen, int row) {
+        ItemStack phoneStack = screen.getSettingsPhoneStack();
+        return switch (row) {
+            case ROW_DARK_MODE -> PhoneSettingsData.isDarkMode(phoneStack);
+            case ROW_SILENT -> PhoneSettingsData.isSilent(phoneStack);
+            case ROW_MESSAGE_POPUP -> PhoneSettingsData.isMessagePopupEnabled(phoneStack);
+            case ROW_PUBLIC_KEY -> PhoneClientPrefs.publicChatKey();
+            case ROW_CLOSE_AFTER_SEND -> PhoneClientPrefs.closeAfterSend();
+            case ROW_HIDE_VANILLA_CHAT -> PhoneClientPrefs.hideVanillaChat();
+            default -> false;
+        };
+    }
+
+    private static void activate(PhoneScreen screen, int row) {
+        boolean flipped = !enabled(screen, row);
+        switch (row) {
+            case ROW_LOCK_WALLPAPER -> screen.openSettingsPage(PAGE_LOCK_WALLPAPER);
+            case ROW_HOME_WALLPAPER -> screen.openSettingsPage(PAGE_HOME_WALLPAPER);
+            case ROW_RINGTONE -> screen.openSettingsPage(PAGE_RINGTONE);
+            case ROW_DARK_MODE -> screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE,
+                    PhoneSettingsData.flagValue(flipped));
+            case ROW_SILENT -> screen.applyPhoneSetting(PhoneSettingsData.KEY_SILENT,
+                    PhoneSettingsData.flagValue(flipped));
+            case ROW_MESSAGE_POPUP -> screen.applyPhoneSetting(PhoneSettingsData.KEY_MESSAGE_POPUP,
+                    PhoneSettingsData.flagValue(flipped));
+            case ROW_PUBLIC_KEY -> PhoneClientPrefs.setPublicChatKey(flipped);
+            case ROW_CLOSE_AFTER_SEND -> PhoneClientPrefs.setCloseAfterSend(flipped);
+            case ROW_HIDE_VANILLA_CHAT -> PhoneClientPrefs.setHideVanillaChat(flipped);
+            default -> {
+            }
+        }
     }
 
     private static Component wallpaperName(String wallpaper) {
@@ -465,7 +833,7 @@ final class PhoneSettingsSurfaceRenderer {
             return;
         }
         screen.applyPhoneSetting(wallpaperSettingKey(page), wallpaper.get());
-        screen.openSettingsPage(PAGE_MAIN);
+        screen.openSettingsPage(PAGE_DISPLAY);
         screen.showStatus("screen.bphone.phone.gallery.wallpaper_set");
     }
 

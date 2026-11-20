@@ -476,7 +476,41 @@ public final class DevUiSnapshots {
             screen.openSettingsApp();
             screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_HOME_WALLPAPER);
         });
-        scene("50_bank", screen -> call(screen, "openBankApp"));
+        scene("44_settings_display", screen -> {
+            screen.openSettingsApp();
+            screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_DISPLAY);
+        });
+        scene("45_settings_sound", screen -> {
+            screen.openSettingsApp();
+            screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_SOUND);
+        });
+        scene("46_settings_chat", screen -> {
+            screen.openSettingsApp();
+            screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_CHAT);
+        });
+        scene("46b_settings_chat_end", screen -> {
+            screen.openSettingsApp();
+            screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_CHAT);
+            for (int step = 0; step < 40; step++) {
+                PhoneSettingsSurfaceRenderer.scroll(screen, -1.0D);
+            }
+        });
+        scene("47_settings_dark", screen -> {
+            screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE, "1");
+            screen.openSettingsApp();
+        });
+        scene("48_settings_chat_dark", screen -> {
+            screen.openSettingsApp();
+            screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_CHAT);
+        });
+        scene("49_settings_sound_dark", screen -> {
+            screen.openSettingsApp();
+            screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_SOUND);
+        });
+        scene("50_bank", screen -> {
+            screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE, "0");
+            call(screen, "openBankApp");
+        });
         scene("51_bank_scan", screen -> {
             call(screen, "openBankApp");
             call(screen, "openBankScanCamera");
@@ -581,6 +615,19 @@ public final class DevUiSnapshots {
             minecraft.player.getInventory().selected = 0;
             PhoneClientPrefs.setHideVanillaChat(true);
             minecraft.gui.getChat().addMessage(Component.literal("this line must not show while vanilla chat is hidden"));
+        });
+        scene("95_settings_toggle", screen -> {
+            screen.openSettingsApp();
+            screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_CHAT);
+            PhoneChatLayout layout = new PhoneChatLayout(screen);
+            int firstRowTop = layout.header().bottom() + 2 * layout.gap + layout.bodyHeight + 2 * layout.u(4)
+                    + layout.sectionHeight + layout.u(3);
+            PhoneSettingsSurfaceRenderer.handleClick(screen, layout.surface.left + layout.surface.width / 2.0D,
+                    firstRowTop + layout.u(8));
+        });
+        world("96_key_off", minecraft -> {
+            minecraft.setScreen(null);
+            call(minecraft, "openChatScreen", "");
         });
         world("97_close_after_send", minecraft -> {
             minecraft.setScreen(null);
