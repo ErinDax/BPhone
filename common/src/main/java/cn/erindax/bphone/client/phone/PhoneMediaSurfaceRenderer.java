@@ -9,7 +9,7 @@ import java.util.List;
 
 final class PhoneMediaSurfaceRenderer {
     private static final int CAMERA_CONTROL_BAND = 0x59000000;
-    private static final int MIN_SIDE_HINT_WIDTH = 64;
+    private static final int MIN_HINT_WIDTH = 64;
 
     private PhoneMediaSurfaceRenderer() {
     }
@@ -31,15 +31,15 @@ final class PhoneMediaSurfaceRenderer {
         int headerHeight = screen.getGalleryHeaderHeight();
         int headerBottom = Math.min(contentBottom, contentTop + headerHeight);
         int headerInset = Math.max(1, Math.round(2 * screen.scale));
-        int headerBleed = Math.max(2, Math.round(4 * screen.scale));
-        int headerLeft = contentLeft - headerBleed;
+        int headerPadding = Math.max(4, Math.round(8 * screen.scale));
+        int headerLeft = displayLeft;
         int headerTop = contentTop + headerInset;
-        int headerRight = contentRight + headerBleed;
+        int headerRight = displayRight;
 
         guiGraphics.fill(displayLeft, displayTop, displayRight, displayBottom, 0xFFFFFFFF);
 
         Component titleText = Component.translatable("screen.bphone.phone.gallery.title");
-        int titleX = headerLeft + Math.round(6 * screen.scale);
+        int titleX = headerLeft + headerPadding;
         int titleY = headerTop + Math.round(7 * screen.scale);
 
         int maxTitleWidth = Math.round((contentRight - contentLeft) * 0.6F);
@@ -53,18 +53,18 @@ final class PhoneMediaSurfaceRenderer {
         pageScale = Math.min(pageScale, 0.85F);
         int scaledPageTextWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, pageText, pageScale);
         int scaledPageTextHeight = PhoneScreenDraw.scaledTextHeight(minecraft.font, pageScale);
-        int pageChipX = headerRight - scaledPageTextWidth - Math.round(7 * screen.scale);
+        int pageChipX = headerRight - scaledPageTextWidth - headerPadding;
         int pageChipY = titleY + titleHeight - scaledPageTextHeight - Math.round(0.5F * screen.scale);
 
         int hintY = titleY + titleHeight + Math.max(5, Math.round(6 * screen.scale));
         Component hintText = Component.translatable("screen.bphone.phone.gallery.hint_open");
-        int hintMaxWidth = Math.max(28, headerRight - headerLeft - Math.round(14 * screen.scale));
+        int hintMaxWidth = Math.max(28, headerRight - headerLeft - 2 * headerPadding);
         float hintScale = PhoneScreenDraw.textScaleToFit(minecraft.font, hintText, hintMaxWidth);
         hintScale = Math.min(hintScale, 0.85F);
         int headerBandBottom = Math.min(headerBottom,
                 hintY + PhoneScreenDraw.scaledTextHeight(minecraft.font, hintScale) + Math.max(6, Math.round(8 * screen.scale)));
 
-        guiGraphics.fill(headerLeft, headerTop, headerRight, headerBandBottom, 0xFF6C92F4);
+        guiGraphics.fill(headerLeft, displayTop, headerRight, headerBandBottom, 0xFF6C92F4);
 
         PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, titleText, titleX, titleY, 0xFFFFFFFF, false, titleScale);
         PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, pageText, pageChipX, pageChipY, 0xFFF2F6FF, false, pageScale);
@@ -196,25 +196,13 @@ final class PhoneMediaSurfaceRenderer {
     }
 
     static void renderCameraSurface(PhoneScreen screen, GuiGraphics guiGraphics) {
-        if (screen.capturePending) {
-            return;
-        }
-
         if (screen.isBankScanCameraActive()) {
             return;
         }
 
         UiRect controlBand = screen.getCameraControlBandBounds();
-        guiGraphics.fill(controlBand.left, controlBand.top, controlBand.right(), controlBand.bottom(), CAMERA_CONTROL_BAND);
-        UiRect rotateBounds = screen.getCameraRotateButtonBounds();
-        int backdropInset = Math.max(1, Math.round(2 * screen.scale));
-        int backdropLeft = rotateBounds.left - backdropInset;
-        int backdropTop = rotateBounds.top - backdropInset;
-        int backdropRight = rotateBounds.right() + backdropInset;
-        int backdropBottom = rotateBounds.bottom() + backdropInset;
-        guiGraphics.fill(backdropLeft + 1, backdropTop, backdropRight - 1, backdropBottom, CAMERA_CONTROL_BAND);
-        guiGraphics.fill(backdropLeft, backdropTop + 1, backdropLeft + 1, backdropBottom - 1, CAMERA_CONTROL_BAND);
-        guiGraphics.fill(backdropRight - 1, backdropTop + 1, backdropRight, backdropBottom - 1, CAMERA_CONTROL_BAND);
+        PhoneUi.fillRounded(guiGraphics, controlBand.left, controlBand.top, controlBand.width, controlBand.height,
+                controlBand.height / 2, CAMERA_CONTROL_BAND);
         renderCameraStorageWarning(screen, guiGraphics);
         renderCameraZoomIndicator(screen, guiGraphics);
 
@@ -251,17 +239,16 @@ final class PhoneMediaSurfaceRenderer {
             return;
         }
 
-        UiRect shutterBounds = screen.getCameraShutterButtonBounds();
-        UiRect captureBounds = screen.getCameraCaptureBounds();
+        UiRect controlBand = screen.getCameraControlBandBounds();
         var font = Minecraft.getInstance().font;
         Component warningText = Component.translatable("screen.bphone.phone.camera.storage_full");
-        int maxTextWidth = Math.max(Math.round(90 * screen.scale), shutterBounds.width + Math.round(36 * screen.scale));
+        int maxTextWidth = Math.max(Math.round(90 * screen.scale), controlBand.width);
         float textScale = PhoneScreenDraw.textScaleToFit(font, warningText, maxTextWidth, 0.45F);
         textScale = Math.min(textScale, 0.9F);
         int textWidth = PhoneScreenDraw.scaledTextWidth(font, warningText, textScale);
         int textHeight = PhoneScreenDraw.scaledTextHeight(font, textScale);
-        int textX = captureBounds.left + (captureBounds.width - textWidth) / 2;
-        int textY = captureBounds.bottom() - textHeight - Math.max(8, Math.round(10 * screen.scale));
+        int textX = controlBand.left + (controlBand.width - textWidth) / 2;
+        int textY = controlBand.top - textHeight - Math.max(8, Math.round(10 * screen.scale));
 
         PhoneScreenDraw.drawScaledText(guiGraphics, font, warningText, textX, textY, 0xFFF7F9FF, true, textScale);
     }
@@ -306,25 +293,14 @@ final class PhoneMediaSurfaceRenderer {
 
     static void renderCameraOverlayHints(PhoneScreen screen, GuiGraphics guiGraphics) {
         int edge = Math.max(4, Math.round(6 * screen.scale));
-        int sideX = screen.frameX + screen.frameWidth + Math.max(8, Math.round(10 * screen.scale));
-        int hintX;
-        int hintY;
-        int hintWidth;
-        if (screen.width - sideX - edge >= MIN_SIDE_HINT_WIDTH) {
-            hintX = sideX;
-            hintY = screen.frameY + Math.max(28, Math.round(34 * screen.scale));
-            hintWidth = screen.width - sideX - edge;
-        } else {
-            hintX = screen.frameX;
-            hintY = screen.frameY + screen.frameHeight + Math.max(4, Math.round(6 * screen.scale));
-            hintWidth = Math.max(48, screen.width - hintX - edge);
-        }
+        int hintX = edge;
+        int hintY = edge;
+        int hintWidth = Math.max(MIN_HINT_WIDTH, Math.round(screen.width * 0.3F));
 
         Component[] hints = {
                 Component.translatable("screen.bphone.phone.camera.hint_drag"),
                 Component.translatable("screen.bphone.phone.camera.hint_zoom"),
                 Component.translatable("screen.bphone.phone.camera.hint_capture"),
-                Component.translatable("screen.bphone.phone.camera.hint_rotate"),
                 Component.translatable("screen.bphone.phone.camera.hint_exit")
         };
         var font = Minecraft.getInstance().font;

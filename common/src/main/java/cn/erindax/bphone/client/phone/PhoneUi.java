@@ -584,7 +584,7 @@ final class PhoneUi {
         guiGraphics.pose().popPose();
     }
 
-    private static int roundInset(int radius, int row) {
+    static int roundInset(int radius, int row) {
         double offset = radius - row - 0.5;
         return radius - (int) Math.round(Math.sqrt(Math.max(0.0, (double) radius * radius - offset * offset)));
     }

@@ -11,6 +11,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Gui.class)
 public abstract class GuiMixin {
+    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
+    private void beat$hideHudInPhoneCamera(GuiGraphics guiGraphics, DeltaTracker deltaTracker, CallbackInfo ci) {
+        if (PhoneClientHooks.shouldHideHud()) {
+            ci.cancel();
+        }
+    }
+
     @Inject(method = "renderCrosshair", at = @At("HEAD"), cancellable = true)
     private void beat$hideCrosshairInPhoneCamera(GuiGraphics guiGraphics, DeltaTracker deltaTracker,
                                                  CallbackInfo ci) {

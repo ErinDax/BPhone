@@ -46,6 +46,11 @@ public final class PhoneClientHooks {
         return phoneScreen != null && phoneScreen.isCameraModeActive();
     }
 
+    public static boolean shouldHideHud() {
+        PhoneScreen phoneScreen = getOpenPhoneScreen();
+        return phoneScreen != null && phoneScreen.isPhotoCameraMode();
+    }
+
     public static boolean shouldHideBlockOutline() {
         PhoneScreen phoneScreen = getOpenPhoneScreen();
         return phoneScreen != null && phoneScreen.isCameraModeActive();

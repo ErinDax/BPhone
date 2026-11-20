@@ -494,10 +494,6 @@ public final class DevUiSnapshots {
             PhoneClientHooks.clearBankReceiveWorldState(true);
             call(screen, "openCamera");
         });
-        scene("61_camera_landscape", screen -> {
-            call(screen, "openCamera");
-            call(screen, "toggleCameraOrientation");
-        });
         world("62_camera_pose_tp", minecraft -> {
             PhoneScreen screen = new PhoneScreen(InteractionHand.MAIN_HAND);
             minecraft.setScreen(screen);
@@ -550,13 +546,13 @@ public final class DevUiSnapshots {
         NativeImage image = Screenshot.takeScreenshot(minecraft.getMainRenderTarget());
         Path file = output.resolve(scene.name() + ".png");
         PhoneScreen screen = phone(minecraft);
-        if (scene.phoneCrop() && screen != null) {
+        if (scene.phoneCrop() && screen != null && !screen.cameraMode) {
             double guiScale = minecraft.getWindow().getGuiScale();
             int margin = 6;
-            int left = Math.max(0, (int) Math.floor((screen.frameX - margin) * guiScale));
-            int top = Math.max(0, (int) Math.floor((screen.frameY - margin) * guiScale));
-            int width = Math.min(image.getWidth() - left, (int) Math.ceil((screen.frameWidth + 2 * margin) * guiScale));
-            int height = Math.min(image.getHeight() - top, (int) Math.ceil((screen.frameHeight + 2 * margin) * guiScale));
+            int left = Math.max(0, (int) Math.floor((screen.displayX - margin) * guiScale));
+            int top = Math.max(0, (int) Math.floor((screen.displayY - margin) * guiScale));
+            int width = Math.min(image.getWidth() - left, (int) Math.ceil((screen.displayWidth + 2 * margin) * guiScale));
+            int height = Math.min(image.getHeight() - top, (int) Math.ceil((screen.displayHeight + 2 * margin) * guiScale));
             NativeImage cropped = new NativeImage(width, height, false);
             image.copyRect(cropped, left, top, 0, 0, width, height, false, false);
             cropped.writeToFile(file);

@@ -1401,14 +1401,12 @@ final class PhoneChatSurfaceRenderer {
 
     static void renderChatCameraOverlay(PhoneScreen screen, GuiGraphics guiGraphics) {
         PhoneChatLayout layout = new PhoneChatLayout(screen);
-        UiRect camera = screen.getCameraViewBounds();
+        UiRect camera = screen.getScanPanelBounds();
         int headerHeight = Math.max(layout.headerHeight + layout.u(10), Math.round(camera.height * 0.15F));
         int footerHeight = Math.max(layout.u(54), Math.round(camera.height * 0.24F));
         int footerTop = camera.bottom() - footerHeight;
-        int bleed = Math.max(4, layout.u(6));
 
-        guiGraphics.fill(camera.left - bleed, camera.top, camera.right() + bleed, camera.top + headerHeight, SCAN_SHADE);
-        guiGraphics.fill(camera.left - bleed, footerTop, camera.right() + bleed, camera.bottom(), SCAN_SHADE);
+        fillRounded(guiGraphics, camera.left, camera.top, camera.width, camera.height, screen.panelRadius(), SCAN_SHADE);
 
         int centerX = camera.left + camera.width / 2;
         int textWidth = camera.width - 2 * layout.pad;
@@ -1427,12 +1425,9 @@ final class PhoneChatSurfaceRenderer {
         drawWrappedCentered(guiGraphics, layout, Component.translatable("phone.chat.add_menu.scan_move_hint"),
                 centerX, hintY + layout.u(4), textWidth, 0xCCFFFFFF, layout.captionScale);
 
-        int availableTop = camera.top + headerHeight + layout.u(14);
-        int availableBottom = footerTop - layout.u(14);
-        int availableHeight = Math.max(layout.u(24), availableBottom - availableTop);
-        int size = Math.min(camera.width - layout.u(34), Math.min(availableHeight, layout.u(92)));
-        int left = camera.left + (camera.width - size) / 2;
-        int top = availableTop + Math.max(0, (availableHeight - size) / 2);
+        int size = Math.min(layout.u(92), Math.min(screen.width, screen.height) / 2);
+        int left = (screen.width - size) / 2;
+        int top = (screen.height - size) / 2;
         int right = left + size;
         int bottom = top + size;
         int cornerLength = Math.max(8, layout.u(16));

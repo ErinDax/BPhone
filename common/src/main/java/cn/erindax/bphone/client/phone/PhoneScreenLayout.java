@@ -15,24 +15,17 @@ final class PhoneScreenLayout {
     private static final int CAMERA_VIEW_SIDE_TRIM = 3;
 
     private final float scale;
-    private final int frameX;
-    private final int frameY;
     private final int displayX;
     private final int displayY;
     private final int displayWidth;
     private final int displayHeight;
-    private final boolean landscape;
 
-    PhoneScreenLayout(float scale, int frameX, int frameY, int displayX, int displayY, int displayWidth, int displayHeight,
-                      boolean landscape) {
+    PhoneScreenLayout(float scale, int displayX, int displayY, int displayWidth, int displayHeight) {
         this.scale = scale;
-        this.frameX = frameX;
-        this.frameY = frameY;
         this.displayX = displayX;
         this.displayY = displayY;
         this.displayWidth = displayWidth;
         this.displayHeight = displayHeight;
-        this.landscape = landscape;
     }
 
     UiRect mediaSurfaceBounds() {
@@ -85,7 +78,7 @@ final class PhoneScreenLayout {
     }
 
     private int galleryGridTopInset() {
-        return Math.max(34, Math.round(40 * scale));
+        return Math.max(37, Math.round(23 * scale) + 21);
     }
 
     int galleryHeaderHeight() {
@@ -408,70 +401,35 @@ final class PhoneScreenLayout {
         return new UiRect(centerX + hangupSize / 2 + gap, buttonY + (hangupSize - speakerSize) / 2, speakerSize, speakerSize);
     }
 
-    private int portraitDisplayWidth() {
-        return landscape ? displayHeight : displayWidth;
-    }
-
-    private int portraitDisplayHeight() {
-        return landscape ? displayWidth : displayHeight;
-    }
-
-    private UiRect phoneRect(int u, int v, int width, int height) {
-        if (!landscape) {
-            return new UiRect(displayX + u, displayY + v, width, height);
-        }
-
-        return new UiRect(displayX + v, displayY + portraitDisplayWidth() - u - width, height, width);
-    }
-
-    private int cameraShutterSize() {
-        return Math.round(42 * scale);
-    }
-
-    private int cameraShutterU() {
-        return (portraitDisplayWidth() - cameraShutterSize()) / 2;
-    }
-
-    private int cameraShutterV() {
-        return portraitDisplayHeight() - cameraShutterSize() - Math.round(18 * scale);
-    }
-
-    UiRect cameraPreviewBounds() {
-        int previewSize = Math.max(20, Math.round(30 * scale));
-        int previewU = Math.max(6, Math.round(8 * scale));
-        int previewV = cameraShutterV() + cameraShutterSize() / 2 - previewSize / 2;
-        return phoneRect(previewU, previewV, previewSize, previewSize);
+    private int cameraControlGap() {
+        return Math.max(6, Math.round(12 * scale));
     }
 
     UiRect cameraShutterButtonBounds() {
-        int shutterSize = cameraShutterSize();
-        return phoneRect(cameraShutterU(), cameraShutterV(), shutterSize, shutterSize);
+        int shutterSize = Math.round(42 * scale);
+        return new UiRect(displayX + (displayWidth - shutterSize) / 2,
+                displayY + displayHeight - shutterSize - Math.round(18 * scale), shutterSize, shutterSize);
+    }
+
+    UiRect cameraPreviewBounds() {
+        UiRect shutterBounds = cameraShutterButtonBounds();
+        int previewSize = Math.max(20, Math.round(30 * scale));
+        return new UiRect(shutterBounds.left - cameraControlGap() - previewSize,
+                shutterBounds.top + (shutterBounds.height - previewSize) / 2, previewSize, previewSize);
     }
 
     UiRect cameraFlipButtonBounds() {
-        int shutterSize = cameraShutterSize();
+        UiRect shutterBounds = cameraShutterButtonBounds();
         int flipButtonSize = Math.round(32 * scale);
-        int flipU = cameraShutterU() + shutterSize + Math.max(2, Math.round(4 * scale));
-        int flipV = cameraShutterV() + Math.max(0, (shutterSize - flipButtonSize) / 2);
-        return phoneRect(flipU, flipV, flipButtonSize, flipButtonSize);
-    }
-
-    UiRect cameraRotateButtonBounds() {
-        int buttonSize = Math.max(14, Math.round(20 * scale));
-        int margin = Math.max(5, Math.round(8 * scale));
-        return phoneRect(portraitDisplayWidth() - margin - buttonSize, margin, buttonSize, buttonSize);
-    }
-
-    UiRect cameraCaptureBounds() {
-        return phoneRect(0, 0, portraitDisplayWidth(), Math.max(1, cameraShutterV()));
+        return new UiRect(shutterBounds.right() + cameraControlGap(),
+                shutterBounds.top + (shutterBounds.height - flipButtonSize) / 2, flipButtonSize, flipButtonSize);
     }
 
     UiRect cameraControlBandBounds() {
-        int bandV = Math.max(0, cameraShutterV());
-        return phoneRect(0, bandV, portraitDisplayWidth(), Math.max(0, portraitDisplayHeight() - bandV));
-    }
-
-    UiRect cameraViewBounds() {
-        return new UiRect(displayX, displayY, displayWidth, displayHeight);
+        UiRect shutterBounds = cameraShutterButtonBounds();
+        int padding = Math.max(4, Math.round(8 * scale));
+        int left = cameraPreviewBounds().left - padding;
+        return new UiRect(left, shutterBounds.top - padding / 2,
+                cameraFlipButtonBounds().right() + padding - left, shutterBounds.height + padding);
     }
 }

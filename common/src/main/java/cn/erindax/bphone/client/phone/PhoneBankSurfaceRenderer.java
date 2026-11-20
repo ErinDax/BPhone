@@ -41,12 +41,10 @@ final class PhoneBankSurfaceRenderer {
     static void renderBankCameraOverlay(PhoneScreen screen, GuiGraphics guiGraphics) {
         PhoneBankLayout layout = new PhoneBankLayout(screen);
         PhoneChatLayout ui = layout.ui;
-        UiRect camera = screen.getCameraViewBounds();
+        UiRect camera = screen.getScanPanelBounds();
         int headerHeight = layout.scanHeaderHeight(camera);
         int footerTop = layout.scanFooterTop(camera);
-        int bleed = Math.max(4, ui.u(6));
-        guiGraphics.fill(camera.left - bleed, camera.top, camera.right() + bleed, camera.top + headerHeight, SCAN_SHADE);
-        guiGraphics.fill(camera.left - bleed, footerTop, camera.right() + bleed, camera.bottom(), SCAN_SHADE);
+        fillRounded(guiGraphics, camera.left, camera.top, camera.width, camera.height, screen.panelRadius(), SCAN_SHADE);
 
         int centerX = camera.left + camera.width / 2;
         int textWidth = camera.width - 2 * ui.pad;
@@ -63,12 +61,9 @@ final class PhoneBankSurfaceRenderer {
                 centerX, footerTop + ui.u(8), textWidth, WHITE, ui.captionScale);
 
         UiRect receive = layout.scanReceive(camera);
-        int availableTop = camera.top + headerHeight + ui.u(14);
-        int availableBottom = footerTop - ui.u(14);
-        int availableHeight = Math.max(ui.u(24), availableBottom - availableTop);
-        int size = Math.min(camera.width - ui.u(34), Math.min(availableHeight, ui.u(92)));
-        int left = camera.left + (camera.width - size) / 2;
-        int top = availableTop + Math.max(0, (availableHeight - size) / 2);
+        int size = Math.min(ui.u(92), Math.min(screen.width, screen.height) / 2);
+        int left = (screen.width - size) / 2;
+        int top = (screen.height - size) / 2;
         int right = left + size;
         int bottom = top + size;
         int cornerLength = Math.max(8, ui.u(16));

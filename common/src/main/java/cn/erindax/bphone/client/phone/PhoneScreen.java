@@ -2,8 +2,6 @@ package cn.erindax.bphone.client.phone;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.math.Axis;
 import cn.erindax.bphone.BPhone;
 import cn.erindax.bphone.ModItems;
 import cn.erindax.bphone.announcement.Announcement;
@@ -12,7 +10,6 @@ import cn.erindax.bphone.client.announcement.AnnouncementClientState;
 import cn.erindax.bphone.client.announcement.AnnouncementNetworkingClient;
 import cn.erindax.bphone.client.notification.NotificationClientState;
 import cn.erindax.bphone.client.notification.NotificationNetworkingClient;
-import cn.erindax.bphone.item.PhoneItem;
 import cn.erindax.bphone.notification.PhoneNotification;
 import cn.erindax.bphone.phone.CallLogEntry;
 import cn.erindax.bphone.phone.PhoneCallPoseAccess;
@@ -74,14 +71,6 @@ import java.util.UUID;
 import java.util.function.IntSupplier;
 
 public final class PhoneScreen extends Screen {
-    private static final ResourceLocation FRAME_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
-            "textures/gui/phone_gui/phone_frame.png");
-    private static final ResourceLocation FRAME_BASE_TINT_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
-            "textures/gui/phone_gui/phone_frame_base_tint.png");
-    private static final ResourceLocation FRAME_EDGE_TINT_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
-            "textures/gui/phone_gui/phone_frame_edge_tint.png");
-    private static final ResourceLocation FRAME_HIGHLIGHT_TINT_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
-            "textures/gui/phone_gui/phone_frame_highlight_tint.png");
     private static final ResourceLocation UNLOCK_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
             "textures/gui/phone_gui/phone_unlock.png");
     private static final ResourceLocation APP_CALL_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
@@ -116,8 +105,6 @@ public final class PhoneScreen extends Screen {
             "textures/gui/phone_gui/shutter_button.png");
     private static final ResourceLocation CAMFLIP_BUTTON_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
             "textures/gui/phone_gui/camflip_button.png");
-    private static final ResourceLocation ROTATE_BUTTON_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
-            "textures/gui/rotate_button.png");
     static final ResourceLocation DELETE_BUTTON_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
             "textures/gui/phone_gui/delete_button.png");
     static final ResourceLocation ANSWER_BUTTON_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
@@ -126,19 +113,12 @@ public final class PhoneScreen extends Screen {
             "textures/gui/phone_gui/hangup_button.png");
     static final ResourceLocation DEFAULT_BACKGROUND_TEXTURE = ResourceLocation.fromNamespaceAndPath(BPhone.MOD_ID,
             "textures/gui/wallpaper/default.png");
-    private static final int FRAME_WIDTH = 160;
-    private static final int FRAME_HEIGHT = 336;
-    private static final float FRAME_SCALE = 0.85F;
-    private static final int DISPLAY_X = 9;
-    private static final int DISPLAY_Y = 16;
-    static final int DISPLAY_WIDTH = 142;
+    static final int DISPLAY_WIDTH = 186;
     static final int DISPLAY_HEIGHT = 300;
+    private static final float PANEL_MARGIN_RATIO = 0.02F;
+    private static final float PANEL_MAX_WIDTH_RATIO = 0.46F;
+    private static final int PHOTO_MAX_EDGE = 1920;
     private static final int UNLOCK_TEXTURE_SIZE = 24;
-    private static final int CAMERA_VIEW_X = 9;
-    private static final int CAMERA_VIEW_Y = 27;
-    private static final int CAMERA_VIEW_WIDTH = 142;
-    private static final int CAMERA_VIEW_HEIGHT = 266;
-    private static final int CAMERA_VIEW_SIDE_TRIM = 3;
     private static final int ICON_SIZE = 30;
     private static final int ICON_TEXTURE_SIZE = 30;
     static final int GALLERY_COLUMNS = 3;
@@ -172,18 +152,14 @@ public final class PhoneScreen extends Screen {
             "", "0", ""
     };
     float scale;
-    int frameX;
-    int frameY;
-    int frameWidth;
-    int frameHeight;
     int displayX;
     int displayY;
     int displayWidth;
     int displayHeight;
     private boolean unlocked;
     boolean cameraMode;
-    boolean cameraLandscape;
-    private boolean layoutLandscape;
+    private boolean layoutFullScreen;
+    private final PhonePanelBuffer panelBuffer = new PhonePanelBuffer();
     boolean galleryMode;
     boolean photoViewerMode;
     boolean callAppMode;
@@ -459,11 +435,15 @@ public final class PhoneScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         PhoneUi.applyTheme(!homePhoneMode && PhoneSettingsData.isDarkMode(getOpenPhoneStack()));
-        if (layoutLandscape != isCameraLandscapeLayout()) {
+        if (layoutFullScreen != isPhotoCameraMode()) {
             rebuildWidgets();
         }
         chatMouseX = mouseX;
         chatMouseY = mouseY;
+        if (capturePending) {
+            completePendingCapture();
+            return;
+        }
         boolean bankScanCameraMode = isBankScanCameraMode();
         boolean chatScanCameraMode = isChatScanCameraMode();
         if (cameraMode) {
@@ -473,8 +453,20 @@ public final class PhoneScreen extends Screen {
             } else if (chatScanCameraMode) {
                 PhoneChatSurfaceRenderer.renderChatCameraOverlay(this, guiGraphics);
             }
-            renderPhoneFrame(guiGraphics);
-        } else {
+            super.render(guiGraphics, mouseX, mouseY, partialTick);
+            if (!bankScanCameraMode && !chatScanCameraMode) {
+                renderCameraOverlayHints(guiGraphics);
+            }
+            if (captureFlashTicks > 0) {
+                renderCaptureFlash(guiGraphics);
+            }
+            renderStatusToast(guiGraphics);
+            return;
+        }
+
+        UiRect panel = new UiRect(displayX, displayY, displayWidth, displayHeight);
+        panelBuffer.begin(guiGraphics);
+        try {
             if (callSessionMode || callAppMode || callContactsMode || addContactMode || chatAppMode || bankAppMode) {
                 renderCallBackdrop(guiGraphics);
             } else if (galleryMode || photoViewerMode) {
@@ -482,34 +474,27 @@ public final class PhoneScreen extends Screen {
             } else if (settingsAppMode || notificationsAppMode || announcementsAppMode || shopAppMode || mapAppMode) {
                 renderAppBackdrop(guiGraphics);
             } else {
-                PhoneWallpaperRenderer.drawWallpaper(this, guiGraphics, currentWallpaperKey(!unlocked),
-                        new UiRect(displayX, displayY, displayWidth, displayHeight), false);
+                PhoneWallpaperRenderer.drawWallpaper(this, guiGraphics, currentWallpaperKey(!unlocked), panel, false);
             }
 
             renderSurface(guiGraphics, partialTick);
-            renderPhoneFrame(guiGraphics);
-        }
-        boolean hideWidgetsForCapture = cameraMode && capturePending;
-        if (!hideWidgetsForCapture) {
             super.render(guiGraphics, mouseX, mouseY, partialTick);
+            renderStatusToast(guiGraphics);
+        } finally {
+            panelBuffer.end(guiGraphics, panel, panelRadius());
         }
+    }
 
-        if (cameraMode && !bankScanCameraMode && !chatScanCameraMode) {
-            renderCameraOverlayHints(guiGraphics);
-        }
-
-        if (hideWidgetsForCapture) {
-            completePendingCapture();
-        }
-
-        if (cameraMode && captureFlashTicks > 0) {
-            renderCaptureFlash(guiGraphics);
-            renderPhoneFrame(guiGraphics);
-        }
-
-        if (statusTicks > 0 && !hideWidgetsForCapture) {
+    private void renderStatusToast(GuiGraphics guiGraphics) {
+        if (statusTicks > 0) {
             PhoneUi.renderToast(guiGraphics, new PhoneChatLayout(this), statusMessage);
         }
+    }
+
+    @Override
+    public void removed() {
+        panelBuffer.release();
+        super.removed();
     }
 
     @Override
@@ -668,11 +653,6 @@ public final class PhoneScreen extends Screen {
                 || keyCode == InputConstants.KEY_RETURN
                 || keyCode == InputConstants.KEY_NUMPADENTER)) {
             tryScanBankPaymentTarget();
-            return true;
-        }
-
-        if (isPhotoCameraMode() && keyCode == InputConstants.KEY_R) {
-            toggleCameraOrientation();
             return true;
         }
 
@@ -933,7 +913,7 @@ public final class PhoneScreen extends Screen {
                 return true;
             }
 
-            if ((button == 0 || button == 1) && getCameraViewBounds().contains(mouseX, mouseY) && !cameraMoveMode) {
+            if ((button == 0 || button == 1) && !getScanPanelBounds().contains(mouseX, mouseY) && !cameraMoveMode) {
                 tryScanBankPaymentTarget();
                 return true;
             }
@@ -945,7 +925,7 @@ public final class PhoneScreen extends Screen {
             if (button == 0) {
                 if (cameraMoveMode) {
                     setCameraMoveMode(false, mouseX, mouseY);
-                } else if (getCameraViewBounds().contains(mouseX, mouseY)) {
+                } else {
                     setCameraMoveMode(true, mouseX, mouseY);
                 }
             }
@@ -1337,34 +1317,22 @@ public final class PhoneScreen extends Screen {
     }
 
     private void updateLayout() {
-        boolean landscape = isCameraLandscapeLayout();
-        float fitScale = Math.min((float) width / FRAME_WIDTH, (float) height / FRAME_HEIGHT);
-        scale = fitScale * FRAME_SCALE;
-
-        frameWidth = Math.round((landscape ? FRAME_HEIGHT : FRAME_WIDTH) * scale);
-        frameHeight = Math.round((landscape ? FRAME_WIDTH : FRAME_HEIGHT) * scale);
-        int baseFrameX = (width - frameWidth) / 2;
-
-        int hotbarOffset = Math.round(height * 0.1F);
-        int baseFrameY = Math.min((height - frameHeight) / 2, height - frameHeight - hotbarOffset);
-
-        frameX = baseFrameX;
-        frameY = baseFrameY;
-
-        if (landscape) {
-            displayX = frameX + Math.round(DISPLAY_Y * scale);
-            displayY = frameY + Math.round((FRAME_WIDTH - DISPLAY_X - DISPLAY_WIDTH) * scale);
-            displayWidth = Math.round(DISPLAY_HEIGHT * scale);
-            displayHeight = Math.round(DISPLAY_WIDTH * scale);
+        int margin = Math.max(3, Math.round(height * PANEL_MARGIN_RATIO));
+        scale = Math.min((float) (height - 2 * margin) / DISPLAY_HEIGHT,
+                width * PANEL_MAX_WIDTH_RATIO / DISPLAY_WIDTH);
+        layoutFullScreen = isPhotoCameraMode();
+        if (layoutFullScreen) {
+            displayX = 0;
+            displayY = 0;
+            displayWidth = width;
+            displayHeight = height;
         } else {
-            displayX = frameX + Math.round(DISPLAY_X * scale);
-            displayY = frameY + Math.round(DISPLAY_Y * scale);
             displayWidth = Math.round(DISPLAY_WIDTH * scale);
             displayHeight = Math.round(DISPLAY_HEIGHT * scale);
+            displayX = margin;
+            displayY = (height - displayHeight) / 2;
         }
-        layoutLandscape = landscape;
-        layoutState = new PhoneScreenLayout(scale, frameX, frameY, displayX, displayY, displayWidth, displayHeight,
-                landscape);
+        layoutState = new PhoneScreenLayout(scale, displayX, displayY, displayWidth, displayHeight);
     }
 
     private void addLockWidgets() {
@@ -1573,12 +1541,6 @@ public final class PhoneScreen extends Screen {
                         60, 60, 60, 60);
             }
         });
-
-        UiRect rotateBounds = getCameraRotateButtonBounds();
-        addRenderableWidget(new ImageButton(
-                rotateBounds.left, rotateBounds.top, rotateBounds.width, rotateBounds.height,
-                0, 0, 0, ROTATE_BUTTON_TEXTURE, 24, 24,
-                button -> toggleCameraOrientation()));
     }
 
     private static class ImageButton extends Button {
@@ -1992,11 +1954,11 @@ public final class PhoneScreen extends Screen {
     }
 
     UiRect getBankScanReceiveButtonBounds() {
-        return new PhoneBankLayout(this).scanReceive(getCameraViewBounds());
+        return new PhoneBankLayout(this).scanReceive(getScanPanelBounds());
     }
 
     UiRect getBankScanEyeButtonBounds() {
-        return new PhoneBankLayout(this).scanEye(getCameraViewBounds());
+        return new PhoneBankLayout(this).scanEye(getScanPanelBounds());
     }
 
     List<PhoneContact> getPhoneContacts() {
@@ -2130,37 +2092,20 @@ public final class PhoneScreen extends Screen {
         return getLayoutState().cameraFlipButtonBounds();
     }
 
-    UiRect getCameraViewBounds() {
-        return getLayoutState().cameraViewBounds();
+    UiRect getScanPanelBounds() {
+        return new UiRect(displayX, displayY, displayWidth, displayHeight);
     }
 
-    UiRect getCameraCaptureBounds() {
-        return getLayoutState().cameraCaptureBounds();
+    int panelRadius() {
+        return Math.max(2, Math.round(8 * scale));
     }
 
     UiRect getCameraControlBandBounds() {
         return getLayoutState().cameraControlBandBounds();
     }
 
-    UiRect getCameraRotateButtonBounds() {
-        return getLayoutState().cameraRotateButtonBounds();
-    }
-
     boolean isPhotoCameraMode() {
         return cameraMode && !isBankScanCameraMode() && !isChatScanCameraMode();
-    }
-
-    boolean isCameraLandscapeLayout() {
-        return cameraLandscape && isPhotoCameraMode();
-    }
-
-    private void toggleCameraOrientation() {
-        if (!isPhotoCameraMode() || capturePending) {
-            return;
-        }
-
-        cameraLandscape = !cameraLandscape;
-        rebuildWidgets();
     }
 
     private void rotateCameraPlayer(double dragX, double dragY) {
@@ -3363,6 +3308,10 @@ public final class PhoneScreen extends Screen {
         }
 
         capturePending = false;
+        if (!isPhotoCameraMode()) {
+            return;
+        }
+
         captureAndSavePhoto();
         captureFlashTicks = 3;
     }
@@ -3379,7 +3328,7 @@ public final class PhoneScreen extends Screen {
         }
 
         NativeImage framebufferImage = null;
-        NativeImage croppedImage = null;
+        NativeImage scaledImage = null;
         try {
             framebufferImage = Screenshot.takeScreenshot(renderTarget);
             int sourceWidth = framebufferImage.getWidth();
@@ -3388,11 +3337,16 @@ public final class PhoneScreen extends Screen {
                 return null;
             }
 
-            croppedImage = cropCameraFeedImage(framebufferImage);
-            if (croppedImage == null) {
-                return null;
+            int longEdge = Math.max(sourceWidth, sourceHeight);
+            if (longEdge <= PHOTO_MAX_EDGE) {
+                return photoStore.writePhoto(framebufferImage);
             }
-            return photoStore.writePhoto(croppedImage);
+
+            scaledImage = new NativeImage(
+                    Math.max(1, Math.round((float) sourceWidth * PHOTO_MAX_EDGE / longEdge)),
+                    Math.max(1, Math.round((float) sourceHeight * PHOTO_MAX_EDGE / longEdge)), false);
+            framebufferImage.resizeSubRectTo(0, 0, sourceWidth, sourceHeight, scaledImage);
+            return photoStore.writePhoto(scaledImage);
         } catch (Exception exception) {
             BPhone.LOGGER.warn("Failed to capture phone photo", exception);
             return null;
@@ -3400,68 +3354,10 @@ public final class PhoneScreen extends Screen {
             if (framebufferImage != null) {
                 framebufferImage.close();
             }
-            if (croppedImage != null) {
-                croppedImage.close();
+            if (scaledImage != null) {
+                scaledImage.close();
             }
         }
-    }
-
-    private NativeImage cropCameraFeedImage(NativeImage source) {
-        if (source == null) {
-            return null;
-        }
-
-        int sourceWidth = source.getWidth();
-        int sourceHeight = source.getHeight();
-        if (sourceWidth <= 0 || sourceHeight <= 0) {
-            return null;
-        }
-
-        UiRect captureBounds = getCameraCaptureBounds();
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null) {
-            return cropImage(source, 0, 0, sourceWidth, sourceHeight);
-        }
-
-        int guiWidth = Math.max(1, minecraft.getWindow().getGuiScaledWidth());
-        int guiHeight = Math.max(1, minecraft.getWindow().getGuiScaledHeight());
-        float scaleX = (float) sourceWidth / guiWidth;
-        float scaleY = (float) sourceHeight / guiHeight;
-
-        int cropX = Mth.clamp(Math.round(captureBounds.left * scaleX), 0, Math.max(0, sourceWidth - 1));
-        int cropY = Mth.clamp(Math.round(captureBounds.top * scaleY), 0, Math.max(0, sourceHeight - 1));
-        int cropWidth = Mth.clamp(Math.round(captureBounds.width * scaleX), 1, sourceWidth - cropX);
-        int cropHeight = Mth.clamp(Math.round(captureBounds.height * scaleY), 1, sourceHeight - cropY);
-
-        return cropImage(source, cropX, cropY, cropWidth, cropHeight);
-    }
-
-    private NativeImage cropImage(NativeImage source, int x, int y, int width, int height) {
-        if (source == null) {
-            return null;
-        }
-
-        int sourceWidth = source.getWidth();
-        int sourceHeight = source.getHeight();
-        if (sourceWidth <= 0 || sourceHeight <= 0 || width <= 0 || height <= 0) {
-            return null;
-        }
-
-        int safeX = Mth.clamp(x, 0, Math.max(0, sourceWidth - 1));
-        int safeY = Mth.clamp(y, 0, Math.max(0, sourceHeight - 1));
-        int safeWidth = Math.min(width, sourceWidth - safeX);
-        int safeHeight = Math.min(height, sourceHeight - safeY);
-        if (safeWidth <= 0 || safeHeight <= 0) {
-            return null;
-        }
-
-        NativeImage croppedImage = new NativeImage(safeWidth, safeHeight, false);
-        for (int row = 0; row < safeHeight; row++) {
-            for (int column = 0; column < safeWidth; column++) {
-                croppedImage.setPixelRGBA(column, row, source.getPixelRGBA(safeX + column, safeY + row));
-            }
-        }
-        return croppedImage;
     }
 
     private ItemStack captureTargetItem() {
@@ -4041,81 +3937,6 @@ public final class PhoneScreen extends Screen {
 
         guiGraphics.fill(flashX, flashY, flashX + flashWidth, flashY + flashHeight,
                 (alpha << 24) | 0x00FFFFFF);
-    }
-
-    private void renderPhoneFrame(GuiGraphics guiGraphics) {
-        guiGraphics.pose().pushPose();
-        if (layoutLandscape) {
-            guiGraphics.pose().translate(frameX, frameY + FRAME_WIDTH * scale, 0.0F);
-            guiGraphics.pose().mulPose(Axis.ZP.rotationDegrees(-90.0F));
-        } else {
-            guiGraphics.pose().translate(frameX, frameY, 0.0F);
-        }
-        guiGraphics.pose().scale(scale, scale, 1.0F);
-        guiGraphics.blit(FRAME_TEXTURE, 0, 0, 0, 0, FRAME_WIDTH, FRAME_HEIGHT, FRAME_WIDTH, FRAME_HEIGHT);
-        renderPhoneTintedTexture(guiGraphics, FRAME_BASE_TINT_TEXTURE, 0, 0,
-                FRAME_WIDTH, FRAME_HEIGHT, FRAME_WIDTH, FRAME_HEIGHT, getOpenPhoneColor());
-        renderPhoneTintedTexture(guiGraphics, FRAME_EDGE_TINT_TEXTURE, 0, 0,
-                FRAME_WIDTH, FRAME_HEIGHT, FRAME_WIDTH, FRAME_HEIGHT, phoneTintEdgeColor());
-        renderPhoneTintedTexture(guiGraphics, FRAME_HIGHLIGHT_TINT_TEXTURE, 0, 0,
-                FRAME_WIDTH, FRAME_HEIGHT, FRAME_WIDTH, FRAME_HEIGHT, phoneTintHighlightColor());
-        guiGraphics.pose().popPose();
-    }
-
-    private void renderPhoneTintedTexture(GuiGraphics guiGraphics, ResourceLocation texture, int x, int y,
-                                          int width, int height, int textureWidth, int textureHeight, int color) {
-        float red = ((color >> 16) & 0xFF) / 255.0F;
-        float green = ((color >> 8) & 0xFF) / 255.0F;
-        float blue = (color & 0xFF) / 255.0F;
-        RenderSystem.setShaderColor(red, green, blue, 1.0F);
-        guiGraphics.blit(texture, x, y, 0, 0, width, height, textureWidth, textureHeight);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-    }
-
-    private int phoneTintEdgeColor() {
-        int color = getOpenPhoneColor();
-        if (color == PhoneItem.DEFAULT_COLOR) {
-            return 0x000000;
-        }
-        return mixWithBlack(color, 0.14F);
-    }
-
-    private int phoneTintHighlightColor() {
-        return mixWithWhite(getOpenPhoneColor(), 0.30F);
-    }
-
-    private static int mixWithWhite(int color, float amount) {
-        int red = (color >> 16) & 0xFF;
-        int green = (color >> 8) & 0xFF;
-        int blue = color & 0xFF;
-        int mixedRed = Mth.clamp(Math.round(red + (255 - red) * amount), 0, 255);
-        int mixedGreen = Mth.clamp(Math.round(green + (255 - green) * amount), 0, 255);
-        int mixedBlue = Mth.clamp(Math.round(blue + (255 - blue) * amount), 0, 255);
-        return (mixedRed << 16) | (mixedGreen << 8) | mixedBlue;
-    }
-
-    private static int mixWithBlack(int color, float amount) {
-        int red = (color >> 16) & 0xFF;
-        int green = (color >> 8) & 0xFF;
-        int blue = color & 0xFF;
-        int mixedRed = Mth.clamp(Math.round(red * (1.0F - amount)), 0, 255);
-        int mixedGreen = Mth.clamp(Math.round(green * (1.0F - amount)), 0, 255);
-        int mixedBlue = Mth.clamp(Math.round(blue * (1.0F - amount)), 0, 255);
-        return (mixedRed << 16) | (mixedGreen << 8) | mixedBlue;
-    }
-
-    private int getOpenPhoneColor() {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null || minecraft.player == null || openHand == null) {
-            return PhoneItem.DEFAULT_COLOR;
-        }
-
-        ItemStack stack = minecraft.player.getItemInHand(openHand);
-        if (stack.getItem() instanceof PhoneItem phoneItem) {
-            return phoneItem.getColor(stack);
-        }
-
-        return PhoneItem.DEFAULT_COLOR;
     }
 
     public boolean isCameraModeActive() {
