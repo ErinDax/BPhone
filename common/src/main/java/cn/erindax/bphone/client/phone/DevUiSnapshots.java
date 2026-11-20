@@ -449,6 +449,10 @@ public final class DevUiSnapshots {
             screen.openSettingsApp();
             screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_ABOUT);
         });
+        scene("43_settings_wallpaper", screen -> {
+            screen.openSettingsApp();
+            screen.openSettingsPage(PhoneSettingsSurfaceRenderer.PAGE_HOME_WALLPAPER);
+        });
         scene("50_bank", screen -> call(screen, "openBankApp"));
         scene("51_bank_scan", screen -> {
             call(screen, "openBankApp");
@@ -499,6 +503,23 @@ public final class DevUiSnapshots {
             minecraft.setScreen(screen);
             call(screen, "openCamera");
             minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+        });
+        scene("63_camera_shot", screen -> {
+            minecraft().options.setCameraType(CameraType.FIRST_PERSON);
+            call(screen, "openCamera");
+            call(screen, "requestPhotoCapture");
+        });
+        scene("64_gallery", screen -> call(screen, "openGallery"));
+        scene("65_photo_viewer", screen -> call(screen, "openPhotoViewer", 0));
+        scene("66_call_dial", screen -> call(screen, "openCallApp"));
+        scene("67_call_contacts", screen -> {
+            call(screen, "openCallApp");
+            call(screen, "openCallContactsPage");
+        });
+        scene("68_call_add_contact", screen -> {
+            call(screen, "openCallApp");
+            call(screen, "openCallContactsPage");
+            call(screen, "openAddContactPage");
         });
         scene("70_announcements", screen -> {
             minecraft().options.setCameraType(CameraType.FIRST_PERSON);
