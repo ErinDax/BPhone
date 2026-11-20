@@ -4,13 +4,17 @@ import cn.erindax.bphone.BPhone;
 import cn.erindax.bphone.phone.PhoneSettingsData;
 import cn.erindax.bphone.phone.PhoneWallpaperData;
 import dev.architectury.platform.Platform;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 import static cn.erindax.bphone.client.phone.PhoneUi.*;
 
@@ -44,6 +48,8 @@ final class PhoneSettingsSurfaceRenderer {
     private static final int MENU_COUNT = 4;
 
     private static final int PICKER_COLUMNS = 3;
+    private static final int IMPORT_CELL = 0;
+    private static final int FIRST_OPTION_CELL = 1;
 
     private record Row(int kind, UiRect rect) {
     }
@@ -75,17 +81,21 @@ final class PhoneSettingsSurfaceRenderer {
             return true;
         }
 
-        if (screen.settingsWallpaperPage == PAGE_LOCK_WALLPAPER || screen.settingsWallpaperPage == PAGE_HOME_WALLPAPER) {
-            boolean lock = screen.settingsWallpaperPage == PAGE_LOCK_WALLPAPER;
+        if (isWallpaperPage(screen.settingsWallpaperPage)) {
             List<String> options = wallpaperOptions(screen);
             UiRect viewport = pickerViewport(layout);
             if (!viewport.contains(mouseX, mouseY)) {
                 return true;
             }
+            if (pickerCell(layout, IMPORT_CELL, screen.settingsPickerScroll).contains(mouseX, mouseY)) {
+                importWallpaper(screen, PhoneWallpaperImport.dialog(
+                        Component.translatable("screen.bphone.phone.settings.wallpaper.import.dialog").getString(),
+                        Component.translatable("screen.bphone.phone.settings.wallpaper.import.filter").getString()));
+                return true;
+            }
             for (int index = 0; index < options.size(); index++) {
-                if (pickerCell(layout, index, screen.settingsPickerScroll).contains(mouseX, mouseY)) {
-                    screen.applyPhoneSetting(lock ? PhoneSettingsData.KEY_LOCK_WALLPAPER : PhoneSettingsData.KEY_HOME_WALLPAPER,
-                            options.get(index));
+                if (pickerCell(layout, FIRST_OPTION_CELL + index, screen.settingsPickerScroll).contains(mouseX, mouseY)) {
+                    screen.applyPhoneSetting(wallpaperSettingKey(screen.settingsWallpaperPage), options.get(index));
                     screen.openSettingsPage(PAGE_MAIN);
                     return true;
                 }
@@ -134,13 +144,21 @@ final class PhoneSettingsSurfaceRenderer {
     }
 
     static void scroll(PhoneScreen screen, double scrollY) {
-        if (screen.settingsWallpaperPage != PAGE_LOCK_WALLPAPER && screen.settingsWallpaperPage != PAGE_HOME_WALLPAPER) {
+        if (!isWallpaperPage(screen.settingsWallpaperPage)) {
             return;
         }
         PhoneChatLayout layout = new PhoneChatLayout(screen);
         int delta = -(int) Math.signum(scrollY) * layout.scrollStep;
         screen.settingsPickerScroll = Mth.clamp(screen.settingsPickerScroll + delta, 0,
                 pickerMaxScroll(layout, wallpaperOptions(screen).size()));
+    }
+
+    static void handleFilesDrop(PhoneScreen screen, List<Path> paths) {
+        if (!isWallpaperPage(screen.settingsWallpaperPage) || paths.isEmpty()) {
+            return;
+        }
+        Path file = paths.get(0);
+        importWallpaper(screen, () -> file);
     }
 
     static void renderWallpaperMenu(PhoneScreen screen, GuiGraphics guiGraphics) {
@@ -271,14 +289,15 @@ final class PhoneSettingsSurfaceRenderer {
         List<String> options = wallpaperOptions(screen);
         UiRect viewport = pickerViewport(layout);
         screen.settingsPickerScroll = Mth.clamp(screen.settingsPickerScroll, 0, pickerMaxScroll(layout, options.size()));
+        int border = Math.max(1, layout.u(2));
         guiGraphics.enableScissor(viewport.left, viewport.top, viewport.right(), viewport.bottom());
+        renderImportCell(screen, guiGraphics, layout, pickerCell(layout, IMPORT_CELL, screen.settingsPickerScroll), border);
         for (int index = 0; index < options.size(); index++) {
-            UiRect cell = pickerCell(layout, index, screen.settingsPickerScroll);
+            UiRect cell = pickerCell(layout, FIRST_OPTION_CELL + index, screen.settingsPickerScroll);
             if (cell.bottom() <= viewport.top || cell.top >= viewport.bottom()) {
                 continue;
             }
             String option = options.get(index);
-            int border = Math.max(1, layout.u(2));
             if (option.equals(current)) {
                 guiGraphics.fill(cell.left - border, cell.top - border, cell.right() + border, cell.bottom() + border, ACCENT);
             } else if (hovered(screen, cell)) {
@@ -286,7 +305,35 @@ final class PhoneSettingsSurfaceRenderer {
             }
             PhoneWallpaperRenderer.drawWallpaper(screen, guiGraphics, option, cell, true);
         }
+        drawWrapped(guiGraphics, layout, importHint(), viewport.left + layout.pad,
+                pickerHintTop(layout, options.size(), screen.settingsPickerScroll), pickerHintWidth(layout),
+                TEXT_TERTIARY, layout.captionScale);
         guiGraphics.disableScissor();
+    }
+
+    private static void renderImportCell(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout,
+                                         UiRect cell, int border) {
+        boolean busy = PhoneWallpaperImport.isBusy();
+        if (!busy && hovered(screen, cell)) {
+            guiGraphics.fill(cell.left - border, cell.top - border, cell.right() + border, cell.bottom() + border, TEXT_TERTIARY);
+        }
+        guiGraphics.fill(cell.left, cell.top, cell.right(), cell.bottom(), SURFACE);
+
+        int arm = Math.max(3, cell.width / 6);
+        int stroke = Math.max(1, layout.u(1.5F));
+        int side = 2 * arm + stroke;
+        int labelGap = layout.u(5);
+        int left = cell.left + (cell.width - side) / 2;
+        int top = cell.top + (cell.height - side - labelGap - layout.captionHeight) / 2;
+        int color = busy ? TEXT_TERTIARY : ACCENT;
+        guiGraphics.fill(left, top + arm, left + side, top + arm + stroke, color);
+        guiGraphics.fill(left + arm, top, left + arm + stroke, top + side, color);
+        Component label = fit(layout, Component.translatable(busy
+                ? "screen.bphone.phone.settings.wallpaper.import.pending"
+                : "screen.bphone.phone.settings.wallpaper.import").getString(), PLAIN,
+                cell.width - 2 * layout.u(2), layout.captionScale);
+        drawCentered(guiGraphics, layout, label, cell.left + cell.width / 2, top + side + labelGap, color,
+                layout.captionScale);
     }
 
     private static void renderAbout(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout) {
@@ -391,6 +438,41 @@ final class PhoneSettingsSurfaceRenderer {
         return options;
     }
 
+    private static boolean isWallpaperPage(int page) {
+        return page == PAGE_LOCK_WALLPAPER || page == PAGE_HOME_WALLPAPER;
+    }
+
+    private static String wallpaperSettingKey(int page) {
+        return page == PAGE_LOCK_WALLPAPER ? PhoneSettingsData.KEY_LOCK_WALLPAPER : PhoneSettingsData.KEY_HOME_WALLPAPER;
+    }
+
+    private static void importWallpaper(PhoneScreen screen, Supplier<Path> source) {
+        if (screen.isPhotoStorageFull()) {
+            screen.showStatus("screen.bphone.phone.camera.storage_full");
+            return;
+        }
+        int page = screen.settingsWallpaperPage;
+        PhoneWallpaperImport.start(source, image -> applyImportedWallpaper(screen, page, image));
+    }
+
+    private static void applyImportedWallpaper(PhoneScreen screen, int page, Optional<byte[]> image) {
+        if (Minecraft.getInstance().screen != screen || screen.settingsWallpaperPage != page) {
+            return;
+        }
+        Optional<String> wallpaper = image.map(screen::importPhoto).map(PhoneWallpaperData::photoKey);
+        if (wallpaper.isEmpty()) {
+            screen.showStatus("screen.bphone.phone.settings.wallpaper.import.failed");
+            return;
+        }
+        screen.applyPhoneSetting(wallpaperSettingKey(page), wallpaper.get());
+        screen.openSettingsPage(PAGE_MAIN);
+        screen.showStatus("screen.bphone.phone.gallery.wallpaper_set");
+    }
+
+    private static Component importHint() {
+        return Component.translatable("screen.bphone.phone.settings.wallpaper.import.hint");
+    }
+
     private static UiRect pickerViewport(PhoneChatLayout layout) {
         int top = layout.header().bottom();
         return new UiRect(layout.surface.left, top, layout.surface.width, Math.max(1, layout.surface.bottom() - top));
@@ -408,14 +490,19 @@ final class PhoneSettingsSurfaceRenderer {
         return new UiRect(left, top, cellWidth, cellHeight);
     }
 
-    private static int pickerMaxScroll(PhoneChatLayout layout, int count) {
-        if (count <= 0) {
-            return 0;
-        }
-        UiRect first = pickerCell(layout, 0, 0);
-        UiRect last = pickerCell(layout, count - 1, 0);
-        int contentHeight = last.bottom() - first.top + 2 * layout.pad;
-        return PhoneChatLayout.maxScroll(pickerViewport(layout), contentHeight);
+    private static int pickerMaxScroll(PhoneChatLayout layout, int optionCount) {
+        UiRect viewport = pickerViewport(layout);
+        int hintHeight = wrappedHeight(layout, importHint(), pickerHintWidth(layout), layout.captionScale);
+        int contentHeight = pickerHintTop(layout, optionCount, 0) + hintHeight + layout.pad - viewport.top;
+        return PhoneChatLayout.maxScroll(viewport, contentHeight);
+    }
+
+    private static int pickerHintTop(PhoneChatLayout layout, int optionCount, int scroll) {
+        return pickerCell(layout, FIRST_OPTION_CELL + optionCount - 1, scroll).bottom() + layout.u(6);
+    }
+
+    private static int pickerHintWidth(PhoneChatLayout layout) {
+        return layout.surface.width - 2 * layout.pad;
     }
 
     private static UiRect menuSheet(PhoneChatLayout layout) {

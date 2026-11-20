@@ -53,21 +53,29 @@ final class PhonePhotoStore {
     }
 
     String writePhoto(NativeImage image) {
-        if (image == null) {
-            return null;
-        }
+        return image == null ? null : writePhotoFile(photoPath -> image.writeToFile(photoPath.toFile()));
+    }
 
+    String writePhoto(byte[] pngData) {
+        return pngData == null || pngData.length == 0 ? null : writePhotoFile(photoPath -> Files.write(photoPath, pngData));
+    }
+
+    private String writePhotoFile(PhotoWriter writer) {
         try {
             Path photoDirectory = getPhotoDirectory();
             Files.createDirectories(photoDirectory);
             String fileName = "phone_" + System.currentTimeMillis() + ".png";
-            Path photoPath = photoDirectory.resolve(fileName);
-            image.writeToFile(photoPath.toFile());
+            writer.write(photoDirectory.resolve(fileName));
             return fileName;
         } catch (Exception exception) {
             BPhone.LOGGER.debug("Failed to write phone photo", exception);
             return null;
         }
+    }
+
+    @FunctionalInterface
+    private interface PhotoWriter {
+        void write(Path photoPath) throws IOException;
     }
 
     boolean appendPhotoToStack(ItemStack phoneStack, String photoFileName, ItemStack captureStack) {

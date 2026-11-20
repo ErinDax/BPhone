@@ -156,6 +156,7 @@ public final class PhoneScreen extends Screen {
     private static final float CAMERA_REAR_MAX_ZOOM_FACTOR = 4.0F;
     private static final float CAMERA_SELFIE_MAX_ZOOM_FACTOR = 3.0F;
     private static final int CAMERA_ZOOM_INDICATOR_TICKS = 30;
+    private static final int STATUS_TICKS = 60;
     private static final double CAMERA_LOOK_TURN_SCALE = 3.0D;
     static final int BANK_SCAN_HOLD_TICKS = 28;
     static final int BANK_PAGE_HOME = 0;
@@ -204,6 +205,8 @@ public final class PhoneScreen extends Screen {
     boolean bankAppMode;
     boolean capturePending;
     private int captureFlashTicks;
+    private Component statusMessage;
+    private int statusTicks;
     int galleryPage;
     int viewerPhotoIndex = -1;
     String dialedNumber = "";
@@ -503,6 +506,10 @@ public final class PhoneScreen extends Screen {
             renderCaptureFlash(guiGraphics);
             renderPhoneFrame(guiGraphics);
         }
+
+        if (statusTicks > 0 && !hideWidgetsForCapture) {
+            PhoneUi.renderToast(guiGraphics, new PhoneChatLayout(this), statusMessage);
+        }
     }
 
     @Override
@@ -512,6 +519,13 @@ public final class PhoneScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    @Override
+    public void onFilesDrop(List<Path> paths) {
+        if (settingsAppMode) {
+            PhoneSettingsSurfaceRenderer.handleFilesDrop(this, paths);
+        }
     }
 
     @Override
@@ -540,6 +554,9 @@ public final class PhoneScreen extends Screen {
         }
         if (announcementDeleteConfirm > 0) {
             announcementDeleteConfirm--;
+        }
+        if (statusTicks > 0) {
+            statusTicks--;
         }
         if (homeWidgetsShown && !Objects.equals(currentBannerId(), homeBannerId)) {
             rebuildWidgets();
@@ -3314,13 +3331,22 @@ public final class PhoneScreen extends Screen {
             return;
         }
 
-        ItemStack captureStack = sanitizePhotoCaptureStack(captureTargetItem());
+        registerPhoto(photoFileName, sanitizePhotoCaptureStack(captureTargetItem()));
+    }
+
+    private boolean registerPhoto(String photoFileName, ItemStack captureStack) {
         if (!appendPhotoToPhone(photoFileName, captureStack)) {
             deletePhotoFile(photoFileName);
-            return;
+            return false;
         }
 
         PhoneNetworkingClient.requestAppendPhotoMetadata(openHand, photoFileName, captureStack);
+        return true;
+    }
+
+    String importPhoto(byte[] pngData) {
+        String photoFileName = isPhotoStorageFull() ? null : photoStore.writePhoto(pngData);
+        return photoFileName != null && registerPhoto(photoFileName, ItemStack.EMPTY) ? photoFileName : null;
     }
 
     private void requestPhotoCapture() {
@@ -3997,11 +4023,9 @@ public final class PhoneScreen extends Screen {
         }
     }
 
-    private void showStatus(String translationKey, Object... args) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player != null) {
-            minecraft.player.displayClientMessage(Component.translatable(translationKey, args), true);
-        }
+    void showStatus(String translationKey, Object... args) {
+        statusMessage = Component.translatable(translationKey, args);
+        statusTicks = STATUS_TICKS;
     }
 
     private void renderCaptureFlash(GuiGraphics guiGraphics) {

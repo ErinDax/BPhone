@@ -450,6 +450,11 @@ final class PhoneUi {
         }
     }
 
+    static int wrappedHeight(PhoneChatLayout layout, Component text, int maxWidth, float textScale) {
+        return layout.font.split(text, Math.max(16, Mth.floor(maxWidth / textScale))).size()
+                * Math.max(1, Math.round(layout.font.lineHeight * textScale));
+    }
+
     static int drawWrapped(GuiGraphics guiGraphics, PhoneChatLayout layout, Component text, int left, int top,
                            int maxWidth, int color, float textScale) {
         int y = top;
@@ -469,6 +474,17 @@ final class PhoneUi {
             y += Math.max(1, Math.round(layout.font.lineHeight * textScale));
         }
         return y;
+    }
+
+    static void renderToast(GuiGraphics guiGraphics, PhoneChatLayout layout, Component text) {
+        UiRect surface = layout.surface;
+        int width = surface.width - 2 * layout.pad;
+        int textWidth = width - 2 * layout.pad;
+        int height = wrappedHeight(layout, text, textWidth, layout.bodyScale) + 2 * layout.gap;
+        int top = surface.bottom() - layout.pad - height;
+        fillRounded(guiGraphics, surface.left + layout.pad, top, width, height, layout.radius * 2, TEXT);
+        drawWrappedCentered(guiGraphics, layout, text, surface.left + surface.width / 2, top + layout.gap, textWidth,
+                PAGE, layout.bodyScale);
     }
 
     static void renderFace(GuiGraphics guiGraphics, ResourceLocation texture, UiRect bounds, int background) {
