@@ -34,6 +34,37 @@ public final class PhoneClientHooks {
         }
     }
 
+    public static boolean openPublicChat(String defaultText) {
+        if (defaultText == null || !defaultText.isEmpty() || !PhoneClientPrefs.publicChatKey()) {
+            return false;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.screen != null
+                || !minecraft.getChatStatus().isChatAllowed(minecraft.isLocalServer())) {
+            return false;
+        }
+
+        InteractionHand hand = null;
+        if (PhoneClientCallState.getState() == PhoneCallState.IDLE) {
+            if (isPhone(minecraft.player.getMainHandItem())) {
+                hand = InteractionHand.MAIN_HAND;
+            } else if (isPhone(minecraft.player.getOffhandItem())) {
+                hand = InteractionHand.OFF_HAND;
+            }
+        }
+        minecraft.setScreen(PhoneScreen.publicChatScreen(hand));
+        return true;
+    }
+
+    public static boolean shouldHideVanillaChat(boolean focused) {
+        if (focused) {
+            return false;
+        }
+
+        return Minecraft.getInstance().screen instanceof PhoneScreen || PhoneClientPrefs.hideVanillaChat();
+    }
+
     public static void openHomePhoneScreen(BlockPos blockPos) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft != null) {
@@ -399,7 +430,8 @@ public final class PhoneClientHooks {
 
     private static PhoneScreen getOpenPhoneScreen() {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null || !(minecraft.screen instanceof PhoneScreen phoneScreen)) {
+        if (minecraft == null || !(minecraft.screen instanceof PhoneScreen phoneScreen)
+                || phoneScreen.isPublicChatOnly()) {
             return null;
         }
 

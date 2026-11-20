@@ -48,6 +48,7 @@ final class PhoneChatSurfaceRenderer {
             case PhoneChatApp.PAGE_BLOCKED -> renderBlocked(screen, app, guiGraphics, layout);
             case PhoneChatApp.PAGE_IMAGE_PICK -> renderImagePick(screen, app, guiGraphics, layout);
             case PhoneChatApp.PAGE_IMAGE_VIEW -> renderImageView(screen, app, guiGraphics, layout);
+            case PhoneChatApp.PAGE_PUBLIC -> PhonePublicChatRenderer.render(screen, app, guiGraphics, layout);
             default -> {
                 if (app.tab == PhoneChatLayout.TAB_CONTACTS) {
                     renderContacts(screen, app, guiGraphics, layout);
@@ -74,6 +75,7 @@ final class PhoneChatSurfaceRenderer {
             case PhoneChatApp.PAGE_BLOCKED -> clickBlocked(screen, app, layout, mouseX, mouseY, button);
             case PhoneChatApp.PAGE_IMAGE_PICK -> clickImagePick(screen, app, layout, mouseX, mouseY, button);
             case PhoneChatApp.PAGE_IMAGE_VIEW -> goBack(screen, app);
+            case PhoneChatApp.PAGE_PUBLIC -> PhonePublicChatRenderer.click(screen, app, layout, mouseX, mouseY, button);
             default -> clickTabs(screen, app, layout, mouseX, mouseY, button);
         }
         return true;
@@ -95,22 +97,27 @@ final class PhoneChatSurfaceRenderer {
         renderSearchButton(screen, guiGraphics, layout, layout.backButton(header));
 
         UiRect viewport = layout.listViewport();
+        int lead = PhonePublicChatRenderer.leadHeight(layout);
         List<PhoneClientChatState.Conversation> conversations = PhoneClientChatState.getConversations();
         if (conversations.isEmpty()) {
-            renderEmptyState(guiGraphics, layout, viewport,
+            app.listScroll = 0;
+            PhonePublicChatRenderer.renderLead(screen, guiGraphics, layout, viewport, 0);
+            renderEmptyState(guiGraphics, layout,
+                    new UiRect(viewport.left, viewport.top + lead, viewport.width, Math.max(1, viewport.height - lead)),
                     Component.translatable("screen.bphone.phone.chat.empty"),
                     Component.translatable("screen.bphone.phone.chat.hint"));
             return;
         }
 
-        int contentHeight = layout.listContentHeight(conversations.size(), true);
+        int contentHeight = lead + layout.listContentHeight(conversations.size(), true);
         app.listScroll = Mth.clamp(app.listScroll, 0, PhoneChatLayout.maxScroll(viewport, contentHeight));
         boolean pointerInside = hovered(screen, viewport);
         UUID self = app.self();
 
         guiGraphics.enableScissor(viewport.left, viewport.top, viewport.right(), viewport.bottom());
+        PhonePublicChatRenderer.renderLead(screen, guiGraphics, layout, viewport, app.listScroll);
         for (int index = 0; index < conversations.size(); index++) {
-            UiRect row = layout.listRow(viewport, index, app.listScroll);
+            UiRect row = layout.listRow(viewport, index, app.listScroll - lead);
             if (row.bottom() <= viewport.top) {
                 continue;
             }
@@ -159,7 +166,7 @@ final class PhoneChatSurfaceRenderer {
             }
         }
 
-        int hintTop = viewport.top + conversations.size() * layout.rowHeight - app.listScroll;
+        int hintTop = viewport.top + lead + conversations.size() * layout.rowHeight - app.listScroll;
         renderListHint(guiGraphics, layout, viewport, hintTop);
         guiGraphics.disableScissor();
     }
@@ -233,7 +240,13 @@ final class PhoneChatSurfaceRenderer {
 
         List<PhoneClientChatState.Conversation> conversations = PhoneClientChatState.getConversations();
         UiRect viewport = layout.listViewport();
-        int index = layout.listRowAt(viewport, conversations.size(), app.listScroll, mouseX, mouseY);
+        int lead = PhonePublicChatRenderer.leadHeight(layout);
+        if (button == 0 && app.menuConversationId == 0L
+                && PhonePublicChatRenderer.leadHit(layout, viewport, app.listScroll, mouseX, mouseY)) {
+            app.openPublic(false);
+            return;
+        }
+        int index = layout.listRowAt(viewport, conversations.size(), app.listScroll - lead, mouseX, mouseY);
         if (button == 1) {
             if (index >= 0) {
                 long id = conversations.get(index).id;
@@ -253,7 +266,7 @@ final class PhoneChatSurfaceRenderer {
 
         PhoneClientChatState.Conversation conversation = conversations.get(index);
         if (app.menuConversationId == conversation.id) {
-            UiRect row = layout.listRow(viewport, index, app.listScroll);
+            UiRect row = layout.listRow(viewport, index, app.listScroll - lead);
             if (layout.rowAction(row, listActionLabel(conversation)).contains(mouseX, mouseY)) {
                 app.deleteFromList(conversation);
             }
@@ -759,7 +772,7 @@ final class PhoneChatSurfaceRenderer {
         }
     }
 
-    private static void renderCaptionLines(GuiGraphics guiGraphics, PhoneChatLayout layout, PhoneChatThread.Item item,
+    static void renderCaptionLines(GuiGraphics guiGraphics, PhoneChatLayout layout, PhoneChatThread.Item item,
                                            UiRect body, int color) {
         int y = body.top + Math.max(1, layout.u(2));
         int centerX = body.left + body.width / 2;
@@ -770,7 +783,7 @@ final class PhoneChatSurfaceRenderer {
         }
     }
 
-    private static void renderMessage(PhoneChatApp app, GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect viewport,
+    static void renderMessage(PhoneChatApp app, GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect viewport,
                                       PhoneChatThread.Placed placed) {
         PhoneChatThread.Item item = placed.item();
         UiRect body = placed.body();
@@ -1532,7 +1545,7 @@ final class PhoneChatSurfaceRenderer {
         return skinOf(member.uuid());
     }
 
-    private static ResourceLocation skinOf(UUID uuid) {
+    static ResourceLocation skinOf(UUID uuid) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.getConnection() != null) {
             PlayerInfo info = minecraft.getConnection().getPlayerInfo(uuid);

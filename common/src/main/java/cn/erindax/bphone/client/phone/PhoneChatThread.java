@@ -54,6 +54,7 @@ final class PhoneChatThread {
                     ? "phone.chat.thread.loading" : "phone.chat.thread.more"), captionWidth));
         }
 
+        boolean publicChannel = PhonePublicChat.isPublic(conversation);
         boolean group = conversation.isGroup();
         Component read = Component.translatable("phone.chat.read");
         Component unread = Component.translatable("phone.chat.unread");
@@ -61,6 +62,9 @@ final class PhoneChatThread {
         int maxBubble = Math.round(viewport.width * 0.72F);
         if (!group) {
             maxBubble = Math.min(maxBubble, viewport.width - 2 * layout.pad - statusWidth - layout.gap);
+        }
+        if (publicChannel) {
+            maxBubble = Math.min(maxBubble, viewport.width - 2 * layout.pad - avatarInset(layout));
         }
         maxBubble = Math.max(layout.u(30), maxBubble);
         int wrapWidth = Math.max(16, Mth.floor((maxBubble - 2 * layout.bubblePadX) / layout.bodyScale));
@@ -81,16 +85,24 @@ final class PhoneChatThread {
             previousTime = entry.createdAt();
 
             if (entry.kind() == ChatStore.ENTRY_SYSTEM) {
-                items.add(caption(layout, ITEM_SYSTEM, entry, ChatNetworkingClient.systemText(entry.body()), captionWidth));
+                items.add(caption(layout, ITEM_SYSTEM, entry, publicChannel
+                        ? Component.literal(entry.body()) : ChatNetworkingClient.systemText(entry.body()), captionWidth));
                 continue;
             }
 
             boolean incoming = self == null || !self.equals(entry.senderUuid());
             String sender = group && incoming ? (entry.senderName().isBlank() ? entry.senderNumber() : entry.senderName()) : null;
+            if (publicChannel && sender != null && !items.isEmpty()) {
+                Item last = items.get(items.size() - 1);
+                if (last.isMessage() && last.incoming() && last.entry().senderUuid().equals(entry.senderUuid())
+                        && last.entry().senderName().equals(entry.senderName())) {
+                    sender = null;
+                }
+            }
             Component status = null;
             boolean beside = false;
             boolean statusRead = true;
-            if (!incoming) {
+            if (!incoming && !publicChannel) {
                 int readers = conversation.readCount(entry);
                 if (!group) {
                     status = readers > 0 ? read : unread;
@@ -176,7 +188,15 @@ final class PhoneChatThread {
         return total;
     }
 
+    static int avatarInset(PhoneChatLayout layout) {
+        return layout.avatarSmall + layout.gap;
+    }
+
     static List<Placed> place(PhoneChatLayout layout, List<Item> items, UiRect viewport, int scroll) {
+        return place(layout, items, viewport, scroll, 0);
+    }
+
+    static List<Placed> place(PhoneChatLayout layout, List<Item> items, UiRect viewport, int scroll, int incomingInset) {
         List<Placed> placed = new ArrayList<>(items.size());
         int cursor = viewport.bottom() - layout.messagePad + scroll;
         for (int index = items.size() - 1; index >= 0; index--) {
@@ -185,7 +205,7 @@ final class PhoneChatThread {
             int bodyTop = top + senderHeight(layout, item);
             int left;
             if (item.isMessage()) {
-                left = item.incoming() ? viewport.left + layout.pad : viewport.right() - layout.pad - item.bodyWidth();
+                left = item.incoming() ? viewport.left + layout.pad + incomingInset : viewport.right() - layout.pad - item.bodyWidth();
             } else {
                 left = viewport.left + (viewport.width - item.bodyWidth()) / 2;
             }

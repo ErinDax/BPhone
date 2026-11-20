@@ -8,6 +8,8 @@
     "client.BlockElementMixin",
     "client.BlockModelMixin",
     "client.CameraMixin",
+    "client.ChatComponentMixin",
+    "client.ChatListenerMixin",
     "client.GameRendererMixin",
     "client.GuiMixin",
     "client.HumanoidModelMixin",
@@ -15,7 +17,8 @@
     "client.ItemInHandRendererMixin",
     "client.KeyboardInputMixin",
     "client.LevelRendererMixin",
-    "client.LocalPlayerMixin"
+    "client.LocalPlayerMixin",
+    "client.MinecraftMixin"
   ],
   "mixins": [
     "PlayerMixin"

@@ -9,6 +9,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.util.StringUtil;
+import org.apache.commons.lang3.StringUtils;
 
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -33,6 +35,7 @@ final class PhoneChatApp {
     static final int PAGE_BLOCKED = 8;
     static final int PAGE_IMAGE_PICK = 9;
     static final int PAGE_IMAGE_VIEW = 10;
+    static final int PAGE_PUBLIC = 11;
 
     static final int ACTION_RENAME = 0;
     static final int ACTION_INVITE = 1;
@@ -50,6 +53,7 @@ final class PhoneChatApp {
     private static final int FIELD_SEARCH = 4;
     private static final int FIELD_GROUP = 5;
     private static final int FIELD_RENAME = 6;
+    private static final int FIELD_PUBLIC = 7;
     private static final int CONFIRM_TICKS = 60;
     private static final int HIGHLIGHT_TICKS = 60;
     private static final int PENDING_TICKS = 100;
@@ -96,6 +100,10 @@ final class PhoneChatApp {
     long anchorConversationId;
     long anchorTailId;
     int anchorContentHeight;
+    String publicDraft = "";
+    int publicScroll;
+    long publicTailId;
+    int publicContentHeight;
 
     PhoneChatApp(PhoneScreen screen) {
         this.screen = screen;
@@ -142,6 +150,10 @@ final class PhoneChatApp {
         anchorConversationId = 0L;
         anchorTailId = 0L;
         anchorContentHeight = 0;
+        publicDraft = "";
+        publicScroll = 0;
+        publicTailId = 0L;
+        publicContentHeight = 0;
     }
 
     void open(int startTab) {
@@ -305,6 +317,51 @@ final class PhoneChatApp {
         }
     }
 
+    void openPublic(boolean root) {
+        publicScroll = 0;
+        publicTailId = 0L;
+        publicContentHeight = 0;
+        if (root) {
+            history.clear();
+            clearMenus();
+            page = PAGE_PUBLIC;
+        } else {
+            go(PAGE_PUBLIC);
+        }
+    }
+
+    private String publicMessage() {
+        return StringUtil.trimChatMessage(StringUtils.normalizeSpace(publicDraft.trim()));
+    }
+
+    boolean canSendPublic() {
+        return !publicMessage().isEmpty();
+    }
+
+    void sendPublic() {
+        Minecraft minecraft = Minecraft.getInstance();
+        String message = publicMessage();
+        if (message.isEmpty() || minecraft.player == null) {
+            return;
+        }
+        Minecraft.ChatStatus chatStatus = minecraft.getChatStatus();
+        if (!chatStatus.isChatAllowed(minecraft.isLocalServer())) {
+            status(chatStatus.getMessage());
+            return;
+        }
+        minecraft.gui.getChat().addRecentChat(message);
+        if (message.startsWith("/")) {
+            minecraft.player.connection.sendCommand(message.substring(1));
+        } else {
+            minecraft.player.connection.sendChat(message);
+        }
+        publicDraft = "";
+        publicScroll = 0;
+        if (PhoneClientPrefs.closeAfterSend()) {
+            screen.onClose();
+        }
+    }
+
     private void enterThread() {
         draft = "";
         threadScroll = 0;
@@ -370,6 +427,9 @@ final class PhoneChatApp {
         }
         if (page == PAGE_THREAD) {
             markRead();
+        }
+        if (page == PAGE_PUBLIC) {
+            PhonePublicChat.markRead();
         }
     }
 
@@ -716,6 +776,7 @@ final class PhoneChatApp {
     private int field() {
         return switch (page) {
             case PAGE_THREAD -> FIELD_DRAFT;
+            case PAGE_PUBLIC -> FIELD_PUBLIC;
             case PAGE_ADD -> FIELD_FRIEND;
             case PAGE_SEARCH -> FIELD_SEARCH;
             case PAGE_GROUP_CREATE -> FIELD_GROUP;
@@ -733,6 +794,7 @@ final class PhoneChatApp {
             case FIELD_SEARCH -> searchQuery;
             case FIELD_GROUP -> groupName;
             case FIELD_RENAME -> renameDraft;
+            case FIELD_PUBLIC -> publicDraft;
             default -> "";
         };
     }
@@ -745,6 +807,7 @@ final class PhoneChatApp {
             case FIELD_SEARCH -> searchQuery = value;
             case FIELD_GROUP -> groupName = value;
             case FIELD_RENAME -> renameDraft = value;
+            case FIELD_PUBLIC -> publicDraft = value;
             default -> {
             }
         }
@@ -757,6 +820,7 @@ final class PhoneChatApp {
             case FIELD_NICKNAME -> PhoneData.MAX_CONTACT_NAME_LENGTH;
             case FIELD_SEARCH -> ChatNetworking.MAX_SEARCH_LENGTH;
             case FIELD_GROUP, FIELD_RENAME -> ChatService.MAX_GROUP_NAME_LENGTH;
+            case FIELD_PUBLIC -> 256;
             default -> 0;
         };
     }
@@ -764,6 +828,9 @@ final class PhoneChatApp {
     private boolean accepts(int field, char character) {
         if (Character.isISOControl(character)) {
             return false;
+        }
+        if (field == FIELD_PUBLIC) {
+            return StringUtil.isAllowedChatCharacter(character);
         }
         return field != FIELD_FRIEND || Character.isDigit(character);
     }
@@ -776,6 +843,7 @@ final class PhoneChatApp {
             case FIELD_SEARCH -> runSearch();
             case FIELD_GROUP -> createGroup();
             case FIELD_RENAME -> saveRename();
+            case FIELD_PUBLIC -> sendPublic();
             default -> {
             }
         }
@@ -851,6 +919,7 @@ final class PhoneChatApp {
         int delta = -(int) Math.signum(scrollY) * layout.scrollStep;
         switch (page) {
             case PAGE_THREAD -> threadScroll = Math.max(0, threadScroll - delta);
+            case PAGE_PUBLIC -> publicScroll = Math.max(0, publicScroll - delta);
             case PAGE_SELECTOR -> selectorScroll = Math.max(0, selectorScroll + delta);
             case PAGE_SEARCH -> searchScroll = Math.max(0, searchScroll + delta);
             case PAGE_GROUP_CREATE, PAGE_INVITE -> groupScroll = Math.max(0, groupScroll + delta);

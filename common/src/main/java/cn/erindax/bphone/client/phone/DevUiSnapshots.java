@@ -278,6 +278,20 @@ public final class DevUiSnapshots {
         PhoneClientChatState.applyState(new ChatPayloads.StateData("Dev", friends,
                 List.of(new ChatPayloads.FriendData("骚扰电话", "66666", null)), conversations));
         PhoneClientChatState.applyRequests(List.of(new PhoneClientChatState.FriendRequest(1L, "50678", "路人甲", now)));
+        injectPublic(minecraft);
+    }
+
+    private static void injectPublic(Minecraft minecraft) {
+        PhonePublicChat.clear();
+        minecraft.gui.getChat().addMessage(Component.translatable("multiplayer.player.joined", "Mika"));
+        PhonePublicChat.addPlayer(MIKA, "Mika", "hi everyone, anyone near the central station?");
+        PhonePublicChat.addPlayer(JIE, "阿杰", "我在，刚从便利店出来");
+        PhonePublicChat.addPlayer(JIE, "阿杰", "周六的钓鱼还去吗");
+        minecraft.gui.getChat().addMessage(Component.translatable("chat.type.text", "小樱",
+                "去呀，我已经把鱼饵买好了，到时候中央车站门口集合"));
+        minecraft.gui.getChat().addMessage(Component.literal("<路人甲> 这条不是在线玩家发的"));
+        minecraft.player.connection.sendChat("我也去，开车带你们");
+        minecraft.player.connection.sendCommand("me 挥了挥手");
     }
 
     private static PhoneScreen phone(Minecraft minecraft) {
@@ -363,6 +377,11 @@ public final class DevUiSnapshots {
             screen.chat.searchHits = List.of(new ChatPayloads.SearchHitData(1L, "小樱",
                     PhoneClientChatState.getConversation(1L).entries.get(2)));
         });
+        scene("17b_public", screen -> {
+            call(screen, "openChatApp", PhoneChatLayout.TAB_CHATS);
+            screen.chat.openPublic(false);
+            screen.chat.publicDraft = "大家晚上好";
+        });
         scene("18_chat_dark", screen -> {
             screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE, "1");
             call(screen, "openChatApp", PhoneChatLayout.TAB_CHATS);
@@ -370,6 +389,10 @@ public final class DevUiSnapshots {
         scene("19_chat_thread_dark", screen -> {
             call(screen, "openChatApp", PhoneChatLayout.TAB_CHATS);
             screen.chat.openConversation(PhoneClientChatState.getConversation(2L));
+        });
+        scene("19b_public_dark", screen -> {
+            call(screen, "openChatApp", PhoneChatLayout.TAB_CHATS);
+            screen.chat.openPublic(false);
         });
         scene("20_map", screen -> {
             screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE, "0");
@@ -531,6 +554,57 @@ public final class DevUiSnapshots {
         });
         scene("80_notifications", PhoneScreen::openNotificationsApp);
         scene("81_home_after", DevUiSnapshots::home);
+        world("90_public_key", minecraft -> {
+            minecraft.setScreen(null);
+            minecraft.gui.getChat().addMessage(Component.literal(
+                    "this vanilla chat line is long enough to reach past the sidebar and must stay hidden behind it"));
+            call(minecraft, "openChatScreen", "");
+        });
+        world("91_public_standalone", minecraft -> {
+            minecraft.setScreen(null);
+            minecraft.player.getInventory().selected = 1;
+            call(minecraft, "openChatScreen", "");
+            if (minecraft.screen instanceof PhoneScreen screen) {
+                screen.chat.publicDraft = "/time set day";
+            }
+        });
+        world("92_vanilla_hud", minecraft -> {
+            minecraft.setScreen(null);
+            minecraft.gui.getChat().addMessage(Component.literal("vanilla chat hud is back when the sidebar is closed"));
+        });
+        world("93_command_key", minecraft -> {
+            minecraft.setScreen(null);
+            call(minecraft, "openChatScreen", "/");
+        });
+        world("94_hide_vanilla", minecraft -> {
+            minecraft.setScreen(null);
+            minecraft.player.getInventory().selected = 0;
+            PhoneClientPrefs.setHideVanillaChat(true);
+            minecraft.gui.getChat().addMessage(Component.literal("this line must not show while vanilla chat is hidden"));
+        });
+        world("97_close_after_send", minecraft -> {
+            minecraft.setScreen(null);
+            PhoneClientPrefs.setPublicChatKey(true);
+            PhoneClientPrefs.setHideVanillaChat(false);
+            PhoneClientPrefs.setCloseAfterSend(true);
+            call(minecraft, "openChatScreen", "");
+            if (minecraft.screen instanceof PhoneScreen screen) {
+                screen.chat.publicDraft = "sent with close after send";
+                screen.chat.sendPublic();
+            }
+        });
+    }
+
+    private static void restorePrefs() {
+        if (!PhoneClientPrefs.publicChatKey()) {
+            PhoneClientPrefs.setPublicChatKey(true);
+        }
+        if (PhoneClientPrefs.closeAfterSend()) {
+            PhoneClientPrefs.setCloseAfterSend(false);
+        }
+        if (PhoneClientPrefs.hideVanillaChat()) {
+            PhoneClientPrefs.setHideVanillaChat(false);
+        }
     }
 
     private static Minecraft minecraft() {
@@ -549,6 +623,7 @@ public final class DevUiSnapshots {
         }
         if (sceneIndex >= SCENES.size()) {
             minecraft.setScreen(null);
+            restorePrefs();
             stage = 9;
             wait = 10;
             return;

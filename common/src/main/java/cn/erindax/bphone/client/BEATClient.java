@@ -21,6 +21,7 @@ import cn.erindax.bphone.client.phone.ChatNetworkingClient;
 import cn.erindax.bphone.client.phone.PhoneClientHooks;
 import cn.erindax.bphone.client.phone.PhoneClientCallState;
 import cn.erindax.bphone.client.phone.PhoneNetworkingClient;
+import cn.erindax.bphone.client.phone.PhonePublicChat;
 import cn.erindax.bphone.client.phone.ShopNetworkingClient;
 import cn.erindax.bphone.client.walkie.WalkieNetworkingClient;
 import cn.erindax.bphone.item.HomePhoneHandsetItem;
@@ -92,6 +93,7 @@ public final class BEATClient {
             resetWalkieTalkState();
             AirstrikeClientState.clear();
             PhoneNetworkingClient.clearClientState();
+            PhonePublicChat.clear();
             NotificationClientState.clear();
             AnnouncementClientState.clear();
             MapClientState.clear();
@@ -109,6 +111,7 @@ public final class BEATClient {
             resetWalkieTalkState();
             AirstrikeClientState.clear();
             PhoneNetworkingClient.clearClientState();
+            PhonePublicChat.clear();
             NotificationClientState.clear();
             AnnouncementClientState.clear();
             MapTerrainCache.reset();

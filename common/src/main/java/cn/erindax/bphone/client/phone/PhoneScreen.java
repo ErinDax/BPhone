@@ -227,6 +227,8 @@ public final class PhoneScreen extends Screen {
     private final boolean homePhoneMode;
     private final boolean startBankReceivePage;
     private boolean startChatProfilePage;
+    private boolean startPublicChat;
+    private boolean publicChatOnly;
     private final PhonePhotoStore photoStore = new PhonePhotoStore(BPhone.MOD_ID);
     private PhoneScreenLayout layoutState;
     private int callSyncCooldown;
@@ -306,6 +308,13 @@ public final class PhoneScreen extends Screen {
         return new PhoneScreen(openHand == null ? InteractionHand.MAIN_HAND : openHand, false, true);
     }
 
+    static PhoneScreen publicChatScreen(InteractionHand openHand) {
+        PhoneScreen screen = new PhoneScreen(openHand == null ? InteractionHand.MAIN_HAND : openHand, false);
+        screen.startPublicChat = true;
+        screen.publicChatOnly = openHand == null;
+        return screen;
+    }
+
     @Override
     protected void init() {
         updateLayout();
@@ -318,6 +327,11 @@ public final class PhoneScreen extends Screen {
         if (startChatProfilePage && !homePhoneMode) {
             startChatProfilePage = false;
             openChatApp(PhoneChatLayout.TAB_PROFILE);
+        }
+        if (startPublicChat && !homePhoneMode) {
+            startPublicChat = false;
+            openChatApp(PhoneChatLayout.TAB_CHATS);
+            chat.openPublic(publicChatOnly);
         }
     }
 
@@ -434,7 +448,7 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        PhoneUi.applyTheme(!homePhoneMode && PhoneSettingsData.isDarkMode(getOpenPhoneStack()));
+        PhoneUi.applyTheme(!homePhoneMode && isDarkTheme());
         if (layoutFullScreen != isPhotoCameraMode()) {
             rebuildWidgets();
         }
@@ -2121,6 +2135,10 @@ public final class PhoneScreen extends Screen {
     }
 
     private void applyCallStateFromServer() {
+        if (publicChatOnly) {
+            return;
+        }
+
         long nextRevision = PhoneClientCallState.getRevision(homePhonePos);
         if (nextRevision == observedCallStateRevision) {
             return;
@@ -2385,6 +2403,10 @@ public final class PhoneScreen extends Screen {
     }
 
     void closeChatApp() {
+        if (publicChatOnly) {
+            onClose();
+            return;
+        }
         chatAppMode = false;
         chatScanActive = false;
         chatScanHoverTicks = 0;
@@ -3897,8 +3919,30 @@ public final class PhoneScreen extends Screen {
         return minecraft.level.getBlockEntity(homePhonePos) instanceof HomePhoneBlockEntity homePhone ? homePhone : null;
     }
 
+    boolean isPublicChatOnly() {
+        return publicChatOnly;
+    }
+
+    private boolean isDarkTheme() {
+        ItemStack stack = getOpenPhoneStack();
+        if (!publicChatOnly || !stack.isEmpty()) {
+            return PhoneSettingsData.isDarkMode(stack);
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null) {
+            for (int slot = 0; slot < minecraft.player.getInventory().getContainerSize(); slot++) {
+                ItemStack candidate = minecraft.player.getInventory().getItem(slot);
+                if (ModItems.isPhone(candidate)) {
+                    return PhoneSettingsData.isDarkMode(candidate);
+                }
+            }
+        }
+        return true;
+    }
+
     private boolean isCallScreenLocked() {
-        if (homePhoneMode) {
+        if (homePhoneMode || publicChatOnly) {
             return false;
         }
 
