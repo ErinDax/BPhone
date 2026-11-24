@@ -28,8 +28,8 @@ final class PhoneChatThread {
     private static final DateTimeFormatter FULL_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     record Item(int type, ChatPayloads.EntryData entry, List<FormattedCharSequence> lines, boolean incoming,
-                String sender, Component status, boolean statusBeside, boolean statusRead, int bodyWidth, int bodyHeight,
-                int height) {
+                String sender, String quoteHeader, boolean mention, Component status, boolean statusBeside,
+                boolean statusRead, int bodyWidth, int bodyHeight, int height) {
         boolean isMessage() {
             return type == ITEM_TEXT || type == ITEM_IMAGE;
         }
@@ -119,23 +119,35 @@ final class PhoneChatThread {
             int statusHeight = status == null || beside ? 0 : layout.u(2) + layout.captionHeight;
             if (entry.kind() == ChatStore.ENTRY_IMAGE) {
                 int[] size = imageSize(layout, entry.imageId(), viewport);
-                items.add(new Item(ITEM_IMAGE, entry, List.of(), incoming, sender, status, beside, statusRead, size[0], size[1],
-                        senderHeight + size[1] + statusHeight));
+                items.add(new Item(ITEM_IMAGE, entry, List.of(), incoming, sender, null, false, status, beside, statusRead,
+                        size[0], size[1], senderHeight + size[1] + statusHeight));
                 continue;
             }
 
-            List<FormattedCharSequence> lines = layout.font.split(Component.literal(entry.body()), wrapWidth);
+            PhonePublicChat.QuoteParts quote = publicChannel ? PhonePublicChat.parseQuote(entry.body()) : null;
+            String displayBody = quote != null ? quote.body() : entry.body();
+            String quoteHeader = quote != null ? quote.header() : null;
+            boolean mention = publicChannel && incoming && PhonePublicChat.mentionsSelf(entry.body());
+
+            List<FormattedCharSequence> lines = layout.font.split(Component.literal(displayBody), wrapWidth);
             if (lines.isEmpty()) {
                 lines = List.of(FormattedCharSequence.EMPTY);
             }
             int widest = 0;
             for (FormattedCharSequence line : lines) {
-                widest = Math.max(widest, layout.font.width(line));
+                widest = Math.max(widest, Mth.ceil(layout.font.width(line) * layout.bodyScale));
             }
-            int width = Math.max(layout.u(16), Mth.ceil(widest * layout.bodyScale) + 2 * layout.bubblePadX);
-            int height = (lines.size() - 1) * layout.bodyLine + layout.bodyHeight + 2 * layout.bubblePadY;
-            items.add(new Item(ITEM_TEXT, entry, lines, incoming, sender, status, beside, statusRead, width, height,
-                    senderHeight + height + statusHeight));
+            int quoteHeight = 0;
+            if (quoteHeader != null) {
+                int quoteW = Math.min(maxBubble - 2 * layout.bubblePadX,
+                        layout.width(Component.literal(quoteHeader), layout.captionScale) + layout.u(8));
+                widest = Math.max(widest, quoteW);
+                quoteHeight = layout.captionHeight + layout.u(5);
+            }
+            int width = Math.max(layout.u(16), widest + 2 * layout.bubblePadX);
+            int height = (lines.size() - 1) * layout.bodyLine + layout.bodyHeight + quoteHeight + 2 * layout.bubblePadY;
+            items.add(new Item(ITEM_TEXT, entry, lines, incoming, sender, quoteHeader, mention, status, beside, statusRead,
+                    width, height, senderHeight + height + statusHeight));
         }
         return items;
     }
@@ -153,7 +165,7 @@ final class PhoneChatThread {
         int padY = Math.max(1, layout.u(2));
         int width = widest + 2 * padX;
         int height = (lines.size() - 1) * layout.captionLine + layout.captionHeight + 2 * padY;
-        return new Item(type, entry, lines, false, null, null, false, true, width, height, height);
+        return new Item(type, entry, lines, false, null, null, false, null, false, true, width, height, height);
     }
 
     private static int[] imageSize(PhoneChatLayout layout, String imageId, UiRect viewport) {

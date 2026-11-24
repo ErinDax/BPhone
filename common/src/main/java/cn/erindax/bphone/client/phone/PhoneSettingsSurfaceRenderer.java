@@ -43,6 +43,14 @@ final class PhoneSettingsSurfaceRenderer {
     private static final int ROW_MODEL = 11;
     private static final int ROW_PHOTOS = 12;
     private static final int ROW_VERSION = 13;
+    private static final int ROW_PANEL_SIDE = 14;
+    private static final int ROW_PANEL_OPACITY = 15;
+    private static final int ROW_WORLD_NAV = 16;
+    private static final int ROW_MENTION_ALERT = 17;
+    private static final int ROW_CHAT_HUD_MODE = 18;
+    private static final int ROW_HUD_COUNT = 19;
+    private static final int ROW_HUD_FADE = 20;
+    private static final int ROW_HUD_OPACITY = 21;
     private static final int GROUP_WALLPAPER = 101;
     private static final int GROUP_APPEARANCE = 102;
     private static final int GROUP_CALLS = 103;
@@ -50,16 +58,24 @@ final class PhoneSettingsSurfaceRenderer {
     private static final int GROUP_PUBLIC = 105;
     private static final int GROUP_VANILLA = 106;
     private static final int GROUP_DEVICE = 107;
+    private static final int GROUP_NAVIGATION = 108;
     private static final int NOTE_CHAT = 201;
 
     private static final int[] DISPLAY_ENTRIES = {
-            GROUP_WALLPAPER, ROW_LOCK_WALLPAPER, ROW_HOME_WALLPAPER, GROUP_APPEARANCE, ROW_DARK_MODE
+            GROUP_WALLPAPER, ROW_LOCK_WALLPAPER, ROW_HOME_WALLPAPER,
+            GROUP_APPEARANCE, ROW_DARK_MODE, ROW_PANEL_SIDE, ROW_PANEL_OPACITY,
+            GROUP_NAVIGATION, ROW_WORLD_NAV
     };
     private static final int[] SOUND_ENTRIES = {
             GROUP_CALLS, ROW_RINGTONE, ROW_SILENT, GROUP_MESSAGES, ROW_MESSAGE_POPUP
     };
-    private static final int[] CHAT_ENTRIES = {
-            GROUP_PUBLIC, ROW_PUBLIC_KEY, ROW_CLOSE_AFTER_SEND, GROUP_VANILLA, ROW_HIDE_VANILLA_CHAT, NOTE_CHAT
+    private static final int[] CHAT_ENTRIES_MODERN_HUD = {
+            GROUP_PUBLIC, ROW_PUBLIC_KEY, ROW_CLOSE_AFTER_SEND, ROW_MENTION_ALERT,
+            GROUP_VANILLA, ROW_CHAT_HUD_MODE, ROW_HUD_COUNT, ROW_HUD_FADE, ROW_HUD_OPACITY, NOTE_CHAT
+    };
+    private static final int[] CHAT_ENTRIES_SIMPLE_HUD = {
+            GROUP_PUBLIC, ROW_PUBLIC_KEY, ROW_CLOSE_AFTER_SEND, ROW_MENTION_ALERT,
+            GROUP_VANILLA, ROW_CHAT_HUD_MODE, NOTE_CHAT
     };
     private static final int[] ABOUT_ENTRIES = {
             GROUP_DEVICE, ROW_NUMBER, ROW_MODEL, ROW_PHOTOS, ROW_VERSION
@@ -73,6 +89,7 @@ final class PhoneSettingsSurfaceRenderer {
     private static final int CONTROL_NAVIGATION = 0;
     private static final int CONTROL_TOGGLE = 1;
     private static final int CONTROL_VALUE = 2;
+    private static final int CONTROL_CYCLE = 3;
 
     private static final int MENU_LOCK = 0;
     private static final int MENU_HOME = 1;
@@ -105,6 +122,13 @@ final class PhoneSettingsSurfaceRenderer {
     }
 
     static void back(PhoneScreen screen) {
+        if (screen.isPublicChatOnly()
+                && screen.settingsWallpaperPage != PAGE_LOCK_WALLPAPER
+                && screen.settingsWallpaperPage != PAGE_HOME_WALLPAPER
+                && screen.settingsWallpaperPage != PAGE_RINGTONE) {
+            screen.closeSettingsApp();
+            return;
+        }
         switch (screen.settingsWallpaperPage) {
             case PAGE_MAIN -> screen.closeSettingsApp();
             case PAGE_LOCK_WALLPAPER, PAGE_HOME_WALLPAPER -> screen.openSettingsPage(PAGE_DISPLAY);
@@ -355,18 +379,35 @@ final class PhoneSettingsSurfaceRenderer {
             drawText(guiGraphics, layout, value, right - valueWidth, top + (head - layout.bodyHeight) / 2,
                     TEXT_SECONDARY, layout.bodyScale);
         } else {
-            drawWrapped(guiGraphics, layout, title, left, top, titleWidth, TEXT, layout.bodyScale);
-            drawWrapped(guiGraphics, layout, description(row), left, top + titleHeight + layout.textGap, inner,
+            int descWidth = descWidth(screen, layout, row, inner);
+            int descHeight = wrappedHeight(layout, description(row), descWidth, layout.captionScale);
+            int textBlockH = titleHeight + layout.textGap + descHeight;
+            int textTop = rect.top + Math.max(rowPad(layout), (rect.height - textBlockH) / 2);
+            drawWrapped(guiGraphics, layout, title, left, textTop, titleWidth, TEXT, layout.bodyScale);
+            drawWrapped(guiGraphics, layout, description(row), left, textTop + titleHeight + layout.textGap, descWidth,
                     TEXT_SECONDARY, layout.captionScale);
-            int controlHeight = switchHeight(layout);
-            int controlTop = rect.bottom() - rowPad(layout) - controlHeight;
+
+            int centerY = rect.top + rect.height / 2;
             if (control == CONTROL_TOGGLE) {
-                renderSwitch(guiGraphics, layout, right - switchWidth(layout), controlTop, enabled(screen, row));
+                int swH = switchHeight(layout);
+                renderSwitch(guiGraphics, layout, right - switchWidth(layout), centerY - swH / 2, enabled(screen, row));
+            } else if (control == CONTROL_CYCLE) {
+                int chipPadX = layout.u(4);
+                int chipH = layout.captionHeight + 2 * layout.u(2.5F);
+                Component chipText = fit(layout, value(screen, row), BOLD, Math.max(layout.u(28), inner * 2 / 5), layout.captionScale);
+                int chipW = layout.width(chipText, layout.captionScale) + 2 * chipPadX;
+                int chipLeft = right - chipW;
+                int chipTop = centerY - chipH / 2;
+                fillRounded(guiGraphics, chipLeft, chipTop, chipW, chipH, chipH / 2, ACCENT_SOFT);
+                drawCentered(guiGraphics, layout, chipText, chipLeft + chipW / 2,
+                        chipTop + (chipH - layout.captionHeight) / 2, ACCENT, layout.captionScale);
             } else {
-                int centerY = controlTop + controlHeight / 2;
                 renderArrow(guiGraphics, layout, right, centerY);
-                drawText(guiGraphics, layout, value, right - layout.chevronReserve() - valueWidth,
-                        centerY - layout.bodyHeight / 2, TEXT_SECONDARY, layout.bodyScale);
+                Component navVal = fit(layout, value(screen, row), PLAIN,
+                        Math.max(layout.u(24), inner / 3), layout.captionScale);
+                int navW = layout.width(navVal, layout.captionScale);
+                drawText(guiGraphics, layout, navVal, right - layout.chevronReserve() - navW,
+                        centerY - layout.captionHeight / 2, TEXT_SECONDARY, layout.captionScale);
             }
         }
         if (!item.last()) {
@@ -384,14 +425,16 @@ final class PhoneSettingsSurfaceRenderer {
     }
 
     private static void renderArrow(GuiGraphics guiGraphics, PhoneChatLayout layout, int right, int centerY) {
-        int arm = layout.chevronArm();
-        int left = right - arm - 1;
-        for (int step = 0; step <= arm; step++) {
-            guiGraphics.fill(left + step, centerY - arm + step, left + step + 1, centerY - arm + step + 1,
-                    TEXT_TERTIARY);
-            guiGraphics.fill(left + step, centerY + arm - step, left + step + 1, centerY + arm - step + 1,
-                    TEXT_TERTIARY);
-        }
+        int density = pixelDensity();
+        float arm = Math.max(2.0F, layout.chevronArm()) * density;
+        float stroke = Math.max(1.2F, density * 0.75F);
+        float rx = (right - 1) * density;
+        float cy = centerY * density;
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        drawSmoothSegment(guiGraphics, rx - arm, cy - arm, rx, cy, stroke, TEXT_TERTIARY);
+        drawSmoothSegment(guiGraphics, rx, cy, rx - arm, cy + arm, stroke, TEXT_TERTIARY);
+        guiGraphics.pose().popPose();
     }
 
     private static void renderSectionIcon(GuiGraphics guiGraphics, int page, UiRect box, int color,
@@ -622,14 +665,33 @@ final class PhoneSettingsSurfaceRenderer {
         if (control(row) == CONTROL_VALUE) {
             return 2 * rowPad(layout) + Math.max(titleHeight, layout.bodyHeight);
         }
-        return 2 * rowPad(layout) + titleHeight + layout.textGap
-                + wrappedHeight(layout, description(row), inner, layout.captionScale)
-                + layout.gap + switchHeight(layout);
+        int descWidth = descWidth(screen, layout, row, inner);
+        int textStack = titleHeight + layout.textGap + wrappedHeight(layout, description(row), descWidth, layout.captionScale);
+        return 2 * rowPad(layout) + Math.max(textStack, switchHeight(layout) + layout.u(2));
+    }
+
+    private static int controlReserve(PhoneScreen screen, PhoneChatLayout layout, int row, int inner) {
+        return switch (control(row)) {
+            case CONTROL_TOGGLE -> switchWidth(layout) + layout.gap;
+            case CONTROL_CYCLE -> {
+                Component chipText = fit(layout, value(screen, row), BOLD, Math.max(layout.u(28), inner * 2 / 5), layout.captionScale);
+                yield layout.width(chipText, layout.captionScale) + 2 * layout.u(4) + layout.gap;
+            }
+            case CONTROL_NAVIGATION -> {
+                Component navVal = fit(layout, value(screen, row), PLAIN, Math.max(layout.u(24), inner / 3), layout.captionScale);
+                yield layout.width(navVal, layout.captionScale) + layout.chevronReserve() + layout.gap;
+            }
+            default -> layout.width(valueText(screen, layout, row, inner), layout.bodyScale) + layout.gap;
+        };
+    }
+
+    private static int descWidth(PhoneScreen screen, PhoneChatLayout layout, int row, int inner) {
+        return Math.max(layout.u(36), inner - controlReserve(screen, layout, row, inner));
     }
 
     private static int titleWidth(PhoneScreen screen, PhoneChatLayout layout, int row, int inner) {
         if (control(row) != CONTROL_VALUE) {
-            return inner;
+            return descWidth(screen, layout, row, inner);
         }
         return Math.max(layout.u(20),
                 inner - layout.gap - layout.width(valueText(screen, layout, row, inner), layout.bodyScale));
@@ -667,7 +729,7 @@ final class PhoneSettingsSurfaceRenderer {
         return switch (page) {
             case PAGE_DISPLAY -> DISPLAY_ENTRIES;
             case PAGE_SOUND -> SOUND_ENTRIES;
-            case PAGE_CHAT -> CHAT_ENTRIES;
+            case PAGE_CHAT -> PhoneClientPrefs.modernChatHud() ? CHAT_ENTRIES_MODERN_HUD : CHAT_ENTRIES_SIMPLE_HUD;
             case PAGE_ABOUT -> ABOUT_ENTRIES;
             default -> NO_ENTRIES;
         };
@@ -681,6 +743,7 @@ final class PhoneSettingsSurfaceRenderer {
         return switch (row) {
             case ROW_LOCK_WALLPAPER, ROW_HOME_WALLPAPER, ROW_RINGTONE -> CONTROL_NAVIGATION;
             case ROW_NUMBER, ROW_MODEL, ROW_PHOTOS, ROW_VERSION -> CONTROL_VALUE;
+            case ROW_PANEL_SIDE, ROW_PANEL_OPACITY, ROW_CHAT_HUD_MODE, ROW_HUD_COUNT, ROW_HUD_FADE, ROW_HUD_OPACITY -> CONTROL_CYCLE;
             default -> CONTROL_TOGGLE;
         };
     }
@@ -690,18 +753,27 @@ final class PhoneSettingsSurfaceRenderer {
             case ROW_LOCK_WALLPAPER -> "lock_wallpaper";
             case ROW_HOME_WALLPAPER -> "home_wallpaper";
             case ROW_DARK_MODE -> "dark_mode";
+            case ROW_PANEL_SIDE -> "panel_side";
+            case ROW_PANEL_OPACITY -> "panel_opacity";
+            case ROW_WORLD_NAV -> "world_nav";
             case ROW_RINGTONE -> "ringtone";
             case ROW_SILENT -> "silent";
             case ROW_MESSAGE_POPUP -> "message_popup";
             case ROW_PUBLIC_KEY -> "public_key";
             case ROW_CLOSE_AFTER_SEND -> "close_after_send";
+            case ROW_MENTION_ALERT -> "mention_alert";
             case ROW_HIDE_VANILLA_CHAT -> "hide_vanilla_chat";
+            case ROW_CHAT_HUD_MODE -> "chat_hud_mode";
+            case ROW_HUD_COUNT -> "hud_count";
+            case ROW_HUD_FADE -> "hud_fade";
+            case ROW_HUD_OPACITY -> "hud_opacity";
             case ROW_NUMBER -> "about.number";
             case ROW_MODEL -> "about.model";
             case ROW_PHOTOS -> "about.photos";
             case ROW_VERSION -> "about.version";
             case GROUP_WALLPAPER -> "group.wallpaper";
             case GROUP_APPEARANCE -> "group.appearance";
+            case GROUP_NAVIGATION -> "group.navigation";
             case GROUP_CALLS -> "group.calls";
             case GROUP_MESSAGES -> "group.messages";
             case GROUP_PUBLIC -> "group.public";
@@ -742,7 +814,23 @@ final class PhoneSettingsSurfaceRenderer {
         return switch (row) {
             case ROW_LOCK_WALLPAPER -> wallpaperName(PhoneWallpaperData.getLockWallpaper(phoneStack)).getString();
             case ROW_HOME_WALLPAPER -> wallpaperName(PhoneWallpaperData.getHomeWallpaper(phoneStack)).getString();
+            case ROW_PANEL_SIDE -> Component.translatable(PhoneClientPrefs.panelRightSide()
+                    ? "screen.bphone.phone.settings.panel_side.right"
+                    : "screen.bphone.phone.settings.panel_side.left").getString();
+            case ROW_PANEL_OPACITY -> PhoneClientPrefs.panelOpacityPercent() + "%";
             case ROW_RINGTONE -> PhoneRingtones.name(PhoneSettingsData.getRingtone(phoneStack)).getString();
+            case ROW_CHAT_HUD_MODE -> Component.translatable(switch (PhoneClientPrefs.chatHudMode()) {
+                case PhoneClientPrefs.HUD_VANILLA -> "screen.bphone.phone.settings.chat_hud_mode.vanilla";
+                case PhoneClientPrefs.HUD_HIDDEN -> "screen.bphone.phone.settings.chat_hud_mode.hidden";
+                default -> "screen.bphone.phone.settings.chat_hud_mode.modern";
+            }).getString();
+            case ROW_HUD_COUNT -> Component.translatable("screen.bphone.phone.settings.hud_count.value",
+                    PhoneClientPrefs.hudMaxMessages()).getString();
+            case ROW_HUD_FADE -> PhoneClientPrefs.hudFadeSeconds() <= 0
+                    ? Component.translatable("screen.bphone.phone.settings.hud_fade.always").getString()
+                    : Component.translatable("screen.bphone.phone.settings.hud_fade.seconds",
+                    PhoneClientPrefs.hudFadeSeconds()).getString();
+            case ROW_HUD_OPACITY -> PhoneClientPrefs.hudOpacityPercent() + "%";
             case ROW_NUMBER -> screen.getOwnPhoneNumber();
             case ROW_MODEL -> phoneStack.isEmpty() ? "-" : phoneStack.getHoverName().getString();
             case ROW_PHOTOS -> screen.getPhotoCount() + " / " + screen.getMaxPhotoCount();
@@ -755,10 +843,12 @@ final class PhoneSettingsSurfaceRenderer {
         ItemStack phoneStack = screen.getSettingsPhoneStack();
         return switch (row) {
             case ROW_DARK_MODE -> PhoneSettingsData.isDarkMode(phoneStack);
+            case ROW_WORLD_NAV -> PhoneClientPrefs.worldNavGuide();
             case ROW_SILENT -> PhoneSettingsData.isSilent(phoneStack);
             case ROW_MESSAGE_POPUP -> PhoneSettingsData.isMessagePopupEnabled(phoneStack);
             case ROW_PUBLIC_KEY -> PhoneClientPrefs.publicChatKey();
             case ROW_CLOSE_AFTER_SEND -> PhoneClientPrefs.closeAfterSend();
+            case ROW_MENTION_ALERT -> PhoneClientPrefs.mentionAlert();
             case ROW_HIDE_VANILLA_CHAT -> PhoneClientPrefs.hideVanillaChat();
             default -> false;
         };
@@ -772,13 +862,24 @@ final class PhoneSettingsSurfaceRenderer {
             case ROW_RINGTONE -> screen.openSettingsPage(PAGE_RINGTONE);
             case ROW_DARK_MODE -> screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE,
                     PhoneSettingsData.flagValue(flipped));
+            case ROW_PANEL_SIDE -> {
+                PhoneClientPrefs.setPanelRightSide(!PhoneClientPrefs.panelRightSide());
+                screen.rebuildWidgets();
+            }
+            case ROW_PANEL_OPACITY -> PhoneClientPrefs.cyclePanelOpacityPercent();
+            case ROW_WORLD_NAV -> PhoneClientPrefs.setWorldNavGuide(flipped);
             case ROW_SILENT -> screen.applyPhoneSetting(PhoneSettingsData.KEY_SILENT,
                     PhoneSettingsData.flagValue(flipped));
             case ROW_MESSAGE_POPUP -> screen.applyPhoneSetting(PhoneSettingsData.KEY_MESSAGE_POPUP,
                     PhoneSettingsData.flagValue(flipped));
             case ROW_PUBLIC_KEY -> PhoneClientPrefs.setPublicChatKey(flipped);
             case ROW_CLOSE_AFTER_SEND -> PhoneClientPrefs.setCloseAfterSend(flipped);
+            case ROW_MENTION_ALERT -> PhoneClientPrefs.setMentionAlert(flipped);
             case ROW_HIDE_VANILLA_CHAT -> PhoneClientPrefs.setHideVanillaChat(flipped);
+            case ROW_CHAT_HUD_MODE -> PhoneClientPrefs.cycleChatHudMode();
+            case ROW_HUD_COUNT -> PhoneClientPrefs.cycleHudMaxMessages();
+            case ROW_HUD_FADE -> PhoneClientPrefs.cycleHudFadeSeconds();
+            case ROW_HUD_OPACITY -> PhoneClientPrefs.cycleHudOpacityPercent();
             default -> {
             }
         }

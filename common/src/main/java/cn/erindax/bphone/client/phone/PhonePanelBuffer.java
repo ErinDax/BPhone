@@ -32,7 +32,7 @@ final class PhonePanelBuffer {
     }
 
     void end(GuiGraphics guiGraphics, UiRect bounds, int radius) {
-        end(guiGraphics, bounds, radius, 1.0F);
+        end(guiGraphics, bounds, radius, PhoneClientPrefs.panelOpacity());
     }
 
     void end(GuiGraphics guiGraphics, UiRect bounds, int radius, float alphaFactor) {

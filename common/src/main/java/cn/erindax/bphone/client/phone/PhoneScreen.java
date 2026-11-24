@@ -159,6 +159,7 @@ public final class PhoneScreen extends Screen {
     private boolean unlocked;
     boolean cameraMode;
     private boolean layoutFullScreen;
+    private boolean layoutRightSide;
     private final PhonePanelBuffer panelBuffer = new PhonePanelBuffer();
     boolean galleryMode;
     boolean photoViewerMode;
@@ -456,7 +457,7 @@ public final class PhoneScreen extends Screen {
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         pollOutsideLook();
         PhoneUi.applyTheme(!homePhoneMode && isDarkTheme());
-        if (layoutFullScreen != isPhotoCameraMode()) {
+        if (layoutFullScreen != isPhotoCameraMode() || layoutRightSide != PhoneClientPrefs.panelRightSide()) {
             rebuildWidgets();
         }
         chatMouseX = mouseX;
@@ -1365,6 +1366,7 @@ public final class PhoneScreen extends Screen {
         scale = Math.min((float) (height - 2 * margin) / DISPLAY_HEIGHT,
                 width * PANEL_MAX_WIDTH_RATIO / DISPLAY_WIDTH);
         layoutFullScreen = isPhotoCameraMode();
+        layoutRightSide = PhoneClientPrefs.panelRightSide();
         if (layoutFullScreen) {
             displayX = 0;
             displayY = 0;
@@ -1373,7 +1375,7 @@ public final class PhoneScreen extends Screen {
         } else {
             displayWidth = Math.round(DISPLAY_WIDTH * scale);
             displayHeight = Math.round(DISPLAY_HEIGHT * scale);
-            displayX = margin;
+            displayX = layoutRightSide ? width - margin - displayWidth : margin;
             displayY = (height - displayHeight) / 2;
         }
         layoutState = new PhoneScreenLayout(scale, displayX, displayY, displayWidth, displayHeight);
@@ -3712,11 +3714,25 @@ public final class PhoneScreen extends Screen {
         rebuildWidgets();
     }
 
+    void openPublicChatSettings() {
+        chatAppMode = false;
+        settingsAppMode = true;
+        settingsWallpaperPage = PhoneSettingsSurfaceRenderer.PAGE_CHAT;
+        settingsPickerScroll = 0;
+        rebuildWidgets();
+    }
+
     void closeSettingsApp() {
         PhoneRingtones.stopPreview();
         settingsAppMode = false;
         settingsWallpaperPage = PhoneSettingsSurfaceRenderer.PAGE_MAIN;
         settingsPickerScroll = 0;
+        if (publicChatOnly) {
+            chatAppMode = true;
+            chat.openPublic(true);
+            rebuildWidgets();
+            return;
+        }
         unlocked = true;
         rebuildWidgets();
     }

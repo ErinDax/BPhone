@@ -816,9 +816,24 @@ final class PhoneChatSurfaceRenderer {
                 }
             }
         } else {
-            fillRounded(guiGraphics, body.left, body.top, body.width, body.height, layout.bubbleRadius,
-                    item.incoming() ? BUBBLE_IN : BUBBLE_OUT);
+            int bubbleBg = item.incoming() ? BUBBLE_IN : BUBBLE_OUT;
+            fillRounded(guiGraphics, body.left, body.top, body.width, body.height, layout.bubbleRadius, bubbleBg);
+            if (item.mention()) {
+                strokeRounded(guiGraphics, body.left, body.top, body.width, body.height, layout.bubbleRadius, 1, HIGHLIGHT);
+            }
             int lineY = body.top + layout.bubblePadY;
+            if (item.quoteHeader() != null) {
+                int qW = Math.max(8, body.width - 2 * layout.bubblePadX);
+                int qH = layout.captionHeight + layout.u(3);
+                fillRounded(guiGraphics, body.left + layout.bubblePadX, lineY, qW, qH, Math.max(2, layout.u(2)),
+                        isDark() ? 0x26FFFFFF : 0x16000000);
+                guiGraphics.fill(body.left + layout.bubblePadX, lineY + 1,
+                        body.left + layout.bubblePadX + Math.max(1, layout.u(1.5F)), lineY + qH - 1, ACCENT);
+                Component qText = fit(layout, item.quoteHeader(), PLAIN, qW - layout.u(7), layout.captionScale);
+                drawText(guiGraphics, layout, qText, body.left + layout.bubblePadX + layout.u(4),
+                        lineY + (qH - layout.captionHeight) / 2, TEXT_SECONDARY, layout.captionScale);
+                lineY += layout.captionHeight + layout.u(5);
+            }
             for (FormattedCharSequence line : item.lines()) {
                 drawSequence(guiGraphics, layout, line, body.left + layout.bubblePadX, lineY, TEXT, layout.bodyScale);
                 lineY += layout.bodyLine;

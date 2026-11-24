@@ -23,6 +23,7 @@ import cn.erindax.bphone.client.phone.PhoneClientCallState;
 import cn.erindax.bphone.client.phone.PhoneFont;
 import cn.erindax.bphone.client.phone.PhoneNetworkingClient;
 import cn.erindax.bphone.client.phone.PhonePublicChat;
+import cn.erindax.bphone.client.phone.PhonePublicChatHud;
 import cn.erindax.bphone.client.phone.ShopNetworkingClient;
 import cn.erindax.bphone.client.walkie.WalkieNetworkingClient;
 import cn.erindax.bphone.item.HomePhoneHandsetItem;
@@ -87,6 +88,7 @@ public final class BEATClient {
         initOptionalVoiceHooks();
         ClientTickEvent.CLIENT_POST.register(BEATClient::onClientTick);
         ClientGuiEvent.RENDER_HUD.register(MapNavigation::renderHud);
+        ClientGuiEvent.RENDER_HUD.register(PhonePublicChatHud::renderHud);
         ClientPlayerEvent.CLIENT_PLAYER_QUIT.register((player) -> {
             homePhoneSneakUseDown = false;
             airstrikeModeCycleDown = false;

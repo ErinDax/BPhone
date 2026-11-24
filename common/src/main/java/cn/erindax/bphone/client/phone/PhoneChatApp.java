@@ -105,6 +105,12 @@ final class PhoneChatApp {
     long publicTailId;
     int publicContentHeight;
     boolean composerFocused = true;
+    String publicReplySender = "";
+    String publicReplySnippet = "";
+    boolean publicEmojiOpen;
+    ChatPayloads.EntryData publicMenuEntry;
+    int publicMenuX;
+    int publicMenuY;
 
     PhoneChatApp(PhoneScreen screen) {
         this.screen = screen;
@@ -156,6 +162,10 @@ final class PhoneChatApp {
         publicTailId = 0L;
         publicContentHeight = 0;
         composerFocused = true;
+        publicReplySender = "";
+        publicReplySnippet = "";
+        publicEmojiOpen = false;
+        publicMenuEntry = null;
     }
 
     void open(int startTab) {
@@ -263,9 +273,23 @@ final class PhoneChatApp {
     void clearMenus() {
         menuConversationId = 0L;
         menuNumber = "";
+        publicMenuEntry = null;
+        publicEmojiOpen = false;
     }
 
     boolean escape() {
+        if (publicMenuEntry != null) {
+            publicMenuEntry = null;
+            return true;
+        }
+        if (publicEmojiOpen) {
+            publicEmojiOpen = false;
+            return true;
+        }
+        if (page == PAGE_PUBLIC && !publicReplySnippet.isEmpty()) {
+            clearPublicReply();
+            return true;
+        }
         if (nicknameEditing) {
             nicknameEditing = false;
             return true;
@@ -323,6 +347,8 @@ final class PhoneChatApp {
         publicScroll = 0;
         publicTailId = 0L;
         publicContentHeight = 0;
+        publicMenuEntry = null;
+        publicEmojiOpen = false;
         composerFocused = true;
         if (root) {
             history.clear();
@@ -331,6 +357,61 @@ final class PhoneChatApp {
         } else {
             go(PAGE_PUBLIC);
         }
+    }
+
+    void setPublicReply(String sender, String body) {
+        PhonePublicChat.QuoteParts parsed = PhonePublicChat.parseQuote(body);
+        String actual = parsed != null ? parsed.body() : body;
+        publicReplySender = sender == null ? "" : sender.trim();
+        publicReplySnippet = actual == null ? "" : actual.replace('\n', ' ').trim();
+        publicMenuEntry = null;
+        publicEmojiOpen = false;
+        focusComposer();
+    }
+
+    void clearPublicReply() {
+        publicReplySender = "";
+        publicReplySnippet = "";
+    }
+
+    void insertPublicText(String snippet) {
+        if (snippet == null || snippet.isEmpty()) {
+            return;
+        }
+        String next = publicDraft + snippet;
+        publicDraft = next.length() > 256 ? next.substring(0, 256) : next;
+        publicEmojiOpen = false;
+        publicMenuEntry = null;
+        focusComposer();
+    }
+
+    void mentionInPublic(String senderName) {
+        if (senderName == null || senderName.isBlank()) {
+            return;
+        }
+        String token = "@" + senderName.trim() + " ";
+        if (!publicDraft.contains(token.trim())) {
+            String prefix = publicDraft.isEmpty() || publicDraft.endsWith(" ") ? publicDraft : publicDraft + " ";
+            String next = prefix + token;
+            publicDraft = next.length() > 256 ? next.substring(0, 256) : next;
+        }
+        publicMenuEntry = null;
+        publicEmojiOpen = false;
+        focusComposer();
+    }
+
+    void startDirectFromPublic(UUID senderUuid, String senderName) {
+        publicMenuEntry = null;
+        publicEmojiOpen = false;
+        if (senderUuid == null || net.minecraft.Util.NIL_UUID.equals(senderUuid) || senderUuid.equals(self())
+                || screen.isHomePhoneMode()) {
+            return;
+        }
+        if (screen.getSettingsPhoneStack().isEmpty()) {
+            status(Component.translatable("phone.chat.public.need_phone"));
+            return;
+        }
+        openDirect(screen.getPlayerPhoneNumber(senderUuid), senderName);
     }
 
     private String publicMessage() {
@@ -352,6 +433,9 @@ final class PhoneChatApp {
             status(chatStatus.getMessage());
             return;
         }
+        if (!message.startsWith("/") && !publicReplySnippet.isBlank()) {
+            message = PhonePublicChat.formatWithQuote(publicReplySender, publicReplySnippet, message);
+        }
         minecraft.gui.getChat().addRecentChat(message);
         if (message.startsWith("/")) {
             minecraft.player.connection.sendCommand(message.substring(1));
@@ -359,6 +443,9 @@ final class PhoneChatApp {
             minecraft.player.connection.sendChat(message);
         }
         publicDraft = "";
+        clearPublicReply();
+        publicEmojiOpen = false;
+        publicMenuEntry = null;
         publicScroll = 0;
         if (PhoneClientPrefs.closeAfterSend()) {
             screen.onClose();

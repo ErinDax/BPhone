@@ -1,5 +1,6 @@
 package cn.erindax.bphone.client.map;
 
+import cn.erindax.bphone.client.phone.PhoneClientPrefs;
 import cn.erindax.bphone.client.phone.PhoneFont;
 import cn.erindax.bphone.client.phone.PhoneScreen;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -50,7 +51,7 @@ public final class MapWorldRenderer {
         LocalPlayer player = minecraft.player;
         if (level == null || player == null || minecraft.options.hideGui
                 || !MapNavigation.isActive() || MapNavigation.isOtherDimension()
-) {
+                || !PhoneClientPrefs.worldNavGuide()) {
             return;
         }
         if (minecraft.screen instanceof PhoneScreen phoneScreen && phoneScreen.isPhotoCameraMode()) {

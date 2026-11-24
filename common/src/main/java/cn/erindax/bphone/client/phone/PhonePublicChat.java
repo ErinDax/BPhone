@@ -1,5 +1,6 @@
 package cn.erindax.bphone.client.phone;
 
+import cn.erindax.bphone.phone.PhoneSettingsData;
 import cn.erindax.bphone.phone.chat.ChatPayloads;
 import cn.erindax.bphone.phone.chat.ChatStore;
 import com.mojang.authlib.GameProfile;
@@ -8,14 +9,18 @@ import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.item.ItemStack;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,6 +31,7 @@ public final class PhonePublicChat {
     private static final int MAX_BODY_LENGTH = 1024;
     private static final String CHAT_KEY = "chat.type.text";
     private static final Pattern BRACKETED = Pattern.compile("^<([^<>\\s]{1,40})> (.+)$", Pattern.DOTALL);
+    private static final Pattern QUOTE_PATTERN = Pattern.compile("^「([^」]{1,80})」\\s*(.+)$", Pattern.DOTALL);
     private static final List<ChatPayloads.EntryData> ENTRIES = new ArrayList<>();
     private static Pending pending;
     private static long nextId = 1L;
@@ -33,6 +39,9 @@ public final class PhonePublicChat {
     private static long revision;
     private static long snapshotRevision = -1L;
     private static PhoneClientChatState.Conversation snapshot;
+
+    public record QuoteParts(String header, String body) {
+    }
 
     private record Pending(UUID uuid, String name, String body, boolean plain) {
     }
@@ -89,8 +98,29 @@ public final class PhonePublicChat {
         if (text.isEmpty()) {
             return;
         }
-        add(new ChatPayloads.EntryData(nextId++, uuid == null ? Util.NIL_UUID : uuid, "", name == null ? "" : name,
+        UUID resolved = uuid == null ? Util.NIL_UUID : uuid;
+        add(new ChatPayloads.EntryData(nextId++, resolved, "", name == null ? "" : name,
                 ChatStore.ENTRY_TEXT, text, "", System.currentTimeMillis()));
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft != null && minecraft.player != null && !minecraft.player.getUUID().equals(resolved)
+                && PhoneClientPrefs.mentionAlert() && mentionsSelf(text)) {
+            if (!isLocalPhoneSilent(minecraft)) {
+                minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.35F, 0.55F));
+            }
+        }
+    }
+
+    private static boolean isLocalPhoneSilent(Minecraft minecraft) {
+        if (minecraft.player == null) {
+            return false;
+        }
+        for (int i = 0; i < minecraft.player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = minecraft.player.getInventory().getItem(i);
+            if (cn.erindax.bphone.ModItems.isPhone(stack)) {
+                return PhoneSettingsData.isSilent(stack);
+            }
+        }
+        return false;
     }
 
     static synchronized void addSystem(String body) {
@@ -108,6 +138,59 @@ public final class PhonePublicChat {
             ENTRIES.remove(0);
         }
         revision++;
+    }
+
+    public static synchronized List<ChatPayloads.EntryData> recentEntries(int maxCount) {
+        if (ENTRIES.isEmpty() || maxCount <= 0) {
+            return List.of();
+        }
+        int from = Math.max(0, ENTRIES.size() - maxCount);
+        return List.copyOf(ENTRIES.subList(from, ENTRIES.size()));
+    }
+
+    public static QuoteParts parseQuote(String body) {
+        if (body == null || !body.startsWith("「")) {
+            return null;
+        }
+        Matcher matcher = QUOTE_PATTERN.matcher(body);
+        if (!matcher.matches()) {
+            return null;
+        }
+        String header = matcher.group(1).trim();
+        String rest = matcher.group(2).trim();
+        return header.isEmpty() || rest.isEmpty() ? null : new QuoteParts(header, rest);
+    }
+
+    public static String formatWithQuote(String replySender, String replySnippet, String message) {
+        if (replySnippet == null || replySnippet.isBlank()) {
+            return message;
+        }
+        String cleanSnippet = replySnippet.replace('\n', ' ').trim();
+        if (cleanSnippet.length() > 28) {
+            cleanSnippet = cleanSnippet.substring(0, 28) + "...";
+        }
+        String prefix = replySender == null || replySender.isBlank()
+                ? "「" + cleanSnippet + "」 "
+                : "「" + replySender + ": " + cleanSnippet + "」 ";
+        String combined = prefix + message;
+        return combined.length() > 256 ? combined.substring(0, 256) : combined;
+    }
+
+    public static boolean mentionsSelf(String body) {
+        if (body == null || body.indexOf('@') < 0) {
+            return false;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.player == null) {
+            return false;
+        }
+        String lower = body.toLowerCase(Locale.ROOT);
+        String gameName = minecraft.player.getGameProfile().getName();
+        if (gameName != null && !gameName.isBlank() && lower.contains("@" + gameName.toLowerCase(Locale.ROOT))) {
+            return true;
+        }
+        String nick = PhoneClientChatState.getOwnNickname();
+        return nick != null && !nick.isBlank() && lower.contains("@" + nick.toLowerCase(Locale.ROOT));
     }
 
     static synchronized PhoneClientChatState.Conversation conversation() {

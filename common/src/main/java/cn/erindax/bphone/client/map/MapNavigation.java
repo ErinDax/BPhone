@@ -1,5 +1,6 @@
 package cn.erindax.bphone.client.map;
 
+import cn.erindax.bphone.client.phone.PhoneClientPrefs;
 import cn.erindax.bphone.client.phone.PhoneFont;
 import cn.erindax.bphone.client.phone.PhoneScreen;
 import cn.erindax.bphone.client.phone.PhoneUi;
@@ -189,7 +190,11 @@ public final class MapNavigation {
                 return;
             }
             int panelWidth = Math.round(graphics.guiWidth() * 0.34F);
-            areaLeft = panelWidth;
+            if (PhoneClientPrefs.panelRightSide()) {
+                areaRight = graphics.guiWidth() - panelWidth;
+            } else {
+                areaLeft = panelWidth;
+            }
         }
         Font font = PhoneFont.get();
         String distance = isOtherDimension()
