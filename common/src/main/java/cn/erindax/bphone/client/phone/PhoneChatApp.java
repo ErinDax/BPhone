@@ -104,6 +104,7 @@ final class PhoneChatApp {
     int publicScroll;
     long publicTailId;
     int publicContentHeight;
+    boolean composerFocused = true;
 
     PhoneChatApp(PhoneScreen screen) {
         this.screen = screen;
@@ -154,6 +155,7 @@ final class PhoneChatApp {
         publicScroll = 0;
         publicTailId = 0L;
         publicContentHeight = 0;
+        composerFocused = true;
     }
 
     void open(int startTab) {
@@ -321,6 +323,7 @@ final class PhoneChatApp {
         publicScroll = 0;
         publicTailId = 0L;
         publicContentHeight = 0;
+        composerFocused = true;
         if (root) {
             history.clear();
             clearMenus();
@@ -370,6 +373,7 @@ final class PhoneChatApp {
         highlightTicks = 0;
         anchorConversationId = 0L;
         historyPendingTicks = 0;
+        composerFocused = true;
         go(PAGE_THREAD);
     }
 
@@ -773,10 +777,22 @@ final class PhoneChatApp {
         back();
     }
 
+    boolean isTextInputActive() {
+        return field() != FIELD_NONE;
+    }
+
+    void focusComposer() {
+        composerFocused = true;
+    }
+
+    void unfocusComposer() {
+        composerFocused = false;
+    }
+
     private int field() {
         return switch (page) {
-            case PAGE_THREAD -> FIELD_DRAFT;
-            case PAGE_PUBLIC -> FIELD_PUBLIC;
+            case PAGE_THREAD -> composerFocused ? FIELD_DRAFT : FIELD_NONE;
+            case PAGE_PUBLIC -> composerFocused ? FIELD_PUBLIC : FIELD_NONE;
             case PAGE_ADD -> FIELD_FRIEND;
             case PAGE_SEARCH -> FIELD_SEARCH;
             case PAGE_GROUP_CREATE -> FIELD_GROUP;

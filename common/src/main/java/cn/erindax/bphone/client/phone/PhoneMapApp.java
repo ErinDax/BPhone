@@ -675,6 +675,10 @@ final class PhoneMapApp {
         go(PAGE_LINE);
     }
 
+    boolean isTextInputActive() {
+        return hasField();
+    }
+
     private boolean hasField() {
         return page == PAGE_SEARCH || page == PAGE_FORM || page == PAGE_LINE_FORM;
     }

@@ -35,7 +35,7 @@ public abstract class LocalPlayerMixin {
 
     private boolean isPhoneCameraMoveModeActive() {
         return this.minecraft.screen instanceof PhoneScreen phoneScreen
-                && phoneScreen.isCameraMoveModeActive();
+                && phoneScreen.allowsWorldMovement();
     }
 
     private boolean isPhysicalKeyDown(KeyMapping keyMapping) {

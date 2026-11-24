@@ -705,7 +705,8 @@ final class PhoneChatSurfaceRenderer {
         renderImageGlyph(guiGraphics, layout, imageButton, ACCENT, imageBackground);
         Component sendLabel = Component.translatable("screen.bphone.phone.chat.send");
         renderField(guiGraphics, layout, layout.draftField(sendLabel), app.draft,
-                Component.translatable("screen.bphone.phone.chat.message_placeholder"), FIELD, FIELD);
+                Component.translatable("screen.bphone.phone.chat.message_placeholder"),
+                app.composerFocused ? ACCENT : FIELD, FIELD, app.composerFocused);
         renderButton(screen, guiGraphics, layout, layout.sendButton(sendLabel), sendLabel,
                 app.canSend() ? Tone.PRIMARY : Tone.DISABLED);
     }
@@ -855,6 +856,10 @@ final class PhoneChatSurfaceRenderer {
             return;
         }
         Component sendLabel = Component.translatable("screen.bphone.phone.chat.send");
+        if (button == 0 && layout.draftField(sendLabel).contains(mouseX, mouseY)) {
+            app.focusComposer();
+            return;
+        }
         if (button == 0 && layout.sendButton(sendLabel).contains(mouseX, mouseY)) {
             app.send();
             return;
@@ -862,6 +867,9 @@ final class PhoneChatSurfaceRenderer {
 
         PhoneClientChatState.Conversation conversation = app.conversation();
         UiRect viewport = layout.threadMessages();
+        if (button == 0 && viewport.contains(mouseX, mouseY)) {
+            app.unfocusComposer();
+        }
         if (conversation == null || !viewport.contains(mouseX, mouseY)) {
             return;
         }

@@ -222,6 +222,11 @@ public final class PhoneScreen extends Screen {
     private double lastCameraMoveMouseX;
     private double lastCameraMoveMouseY;
     private boolean savedRawMouseMotion;
+    private boolean outsideLookActive;
+    private double savedLookCursorX;
+    private double savedLookCursorY;
+    private double lastOutsideLookRawX;
+    private double lastOutsideLookRawY;
     private final InteractionHand openHand;
     private final BlockPos homePhonePos;
     private final boolean homePhoneMode;
@@ -402,6 +407,7 @@ public final class PhoneScreen extends Screen {
         bankScanHoverTargetId = null;
         bankScanHoverTicks = 0;
         bankScanRequestCooldown = 0;
+        setOutsideLookMode(false);
         setCameraMoveMode(false, 0.0D, 0.0D);
         releasePhotoTextures();
         super.onClose();
@@ -448,6 +454,7 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        pollOutsideLook();
         PhoneUi.applyTheme(!homePhoneMode && isDarkTheme());
         if (layoutFullScreen != isPhotoCameraMode()) {
             rebuildWidgets();
@@ -507,6 +514,7 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public void removed() {
+        setOutsideLookMode(false);
         panelBuffer.release();
         super.removed();
     }
@@ -601,8 +609,10 @@ public final class PhoneScreen extends Screen {
             activeCallTicks = PhoneClientCallState.getConnectedDurationTicks(homePhonePos);
         }
 
-        if (cameraMode && cameraMoveMode) {
+        if (allowsWorldMovement()) {
             syncCameraMovementKeys();
+        } else {
+            releaseWorldMovementKeys();
         }
 
         if (bankScanRequestCooldown > 0) {
@@ -625,8 +635,9 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (cameraMode && cameraMoveMode && handleMovementKey(keyCode, scanCode, true)) {
-            return false;
+        if (allowsWorldMovement() && !(isPhotoCameraMode() && !cameraMoveMode && keyCode == InputConstants.KEY_SPACE)
+                && handleMovementKey(keyCode, scanCode, true)) {
+            return true;
         }
 
         if (isChatScanCameraMode()) {
@@ -864,8 +875,8 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        if (cameraMode && cameraMoveMode && handleMovementKey(keyCode, scanCode, false)) {
-            return false;
+        if (allowsWorldMovement() && handleMovementKey(keyCode, scanCode, false)) {
+            return true;
         }
 
         return super.keyReleased(keyCode, scanCode, modifiers);
@@ -907,6 +918,19 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (outsideLookActive && button == 1) {
+            return true;
+        }
+        if (!cameraMode && !homePhoneMode && !isInsidePhonePanel(mouseX, mouseY)) {
+            if (chatAppMode) {
+                chat.unfocusComposer();
+            }
+            if (button == 1) {
+                setOutsideLookMode(true);
+                return true;
+            }
+            return true;
+        }
         if (isBankScanCameraMode()) {
             if (button == 0 && getBankScanReceiveButtonBounds().contains(mouseX, mouseY)) {
                 openBankReceivePage();
@@ -1226,6 +1250,9 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (outsideLookActive) {
+            return true;
+        }
         if (cameraMode && cameraMoveMode) {
             lastCameraMoveMouseX = mouseX;
             lastCameraMoveMouseY = mouseY;
@@ -1242,9 +1269,12 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public void mouseMoved(double mouseX, double mouseY) {
+        if (outsideLookActive) {
+            return;
+        }
         lastMouseX = mouseX;
         lastMouseY = mouseY;
-        
+
         if (cameraMode && cameraMoveMode) {
             rotateCameraPlayer(mouseX - lastCameraMoveMouseX, mouseY - lastCameraMoveMouseY);
             lastCameraMoveMouseX = mouseX;
@@ -1257,6 +1287,10 @@ public final class PhoneScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (outsideLookActive && button == 1) {
+            setOutsideLookMode(false);
+            return true;
+        }
         if (cameraMode && cameraMoveMode && button == 0) {
             return true;
         }
@@ -2151,6 +2185,116 @@ public final class PhoneScreen extends Screen {
 
     int panelRadius() {
         return Math.max(4, Math.round(10 * scale));
+    }
+
+    public boolean isInsidePhonePanel(double mouseX, double mouseY) {
+        if (layoutFullScreen) {
+            return true;
+        }
+        return mouseX >= displayX && mouseX < displayX + displayWidth
+                && mouseY >= displayY && mouseY < displayY + displayHeight;
+    }
+
+    public boolean isTextInputActive() {
+        if (addContactMode) {
+            return true;
+        }
+        if (chatAppMode && chat.isTextInputActive()) {
+            return true;
+        }
+        return mapAppMode && map.isTextInputActive();
+    }
+
+    public boolean allowsWorldMovement() {
+        if (homePhoneMode) {
+            return false;
+        }
+        if (cameraMode) {
+            return cameraMoveMode;
+        }
+        return !isTextInputActive();
+    }
+
+    private void setOutsideLookMode(boolean enabled) {
+        if (outsideLookActive == enabled) {
+            return;
+        }
+        outsideLookActive = enabled;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.getWindow() == null) {
+            return;
+        }
+        long windowHandle = minecraft.getWindow().getWindow();
+        if (enabled) {
+            double[] cx = new double[1];
+            double[] cy = new double[1];
+            GLFW.glfwGetCursorPos(windowHandle, cx, cy);
+            savedLookCursorX = cx[0];
+            savedLookCursorY = cy[0];
+            if (GLFW.glfwRawMouseMotionSupported()) {
+                savedRawMouseMotion = GLFW.glfwGetInputMode(windowHandle, GLFW.GLFW_RAW_MOUSE_MOTION) == GLFW.GLFW_TRUE;
+                GLFW.glfwSetInputMode(windowHandle, GLFW.GLFW_RAW_MOUSE_MOTION, GLFW.GLFW_TRUE);
+            }
+            GLFW.glfwSetInputMode(windowHandle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+            GLFW.glfwGetCursorPos(windowHandle, cx, cy);
+            lastOutsideLookRawX = cx[0];
+            lastOutsideLookRawY = cy[0];
+        } else {
+            if (GLFW.glfwRawMouseMotionSupported()) {
+                GLFW.glfwSetInputMode(windowHandle, GLFW.GLFW_RAW_MOUSE_MOTION,
+                        savedRawMouseMotion ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
+            }
+            InputConstants.grabOrReleaseMouse(windowHandle, GLFW.GLFW_CURSOR_NORMAL, savedLookCursorX, savedLookCursorY);
+            minecraft.mouseHandler.setIgnoreFirstMove();
+        }
+    }
+
+    private void pollOutsideLook() {
+        if (!outsideLookActive) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.player == null || minecraft.getWindow() == null) {
+            setOutsideLookMode(false);
+            return;
+        }
+        long windowHandle = minecraft.getWindow().getWindow();
+        if (GLFW.glfwGetMouseButton(windowHandle, GLFW.GLFW_MOUSE_BUTTON_RIGHT) != GLFW.GLFW_PRESS
+                || cameraMode || homePhoneMode) {
+            setOutsideLookMode(false);
+            return;
+        }
+        double[] cx = new double[1];
+        double[] cy = new double[1];
+        GLFW.glfwGetCursorPos(windowHandle, cx, cy);
+        double dx = cx[0] - lastOutsideLookRawX;
+        double dy = cy[0] - lastOutsideLookRawY;
+        lastOutsideLookRawX = cx[0];
+        lastOutsideLookRawY = cy[0];
+        if (dx == 0.0D && dy == 0.0D) {
+            return;
+        }
+        double sens = minecraft.options.sensitivity().get() * 0.6D + 0.2D;
+        double factor = sens * sens * sens * 8.0D;
+        double invert = minecraft.options.invertYMouse().get() ? -1.0D : 1.0D;
+        minecraft.player.turn(dx * factor, dy * factor * invert);
+    }
+
+    private void releaseWorldMovementKeys() {
+        if (cameraMode && cameraMoveMode) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null) {
+            return;
+        }
+        minecraft.options.keyUp.setDown(false);
+        minecraft.options.keyLeft.setDown(false);
+        minecraft.options.keyDown.setDown(false);
+        minecraft.options.keyRight.setDown(false);
+        minecraft.options.keyJump.setDown(false);
+        minecraft.options.keySprint.setDown(false);
+        minecraft.options.keyShift.setDown(false);
     }
 
     UiRect getCameraControlBandBounds() {

@@ -34,7 +34,7 @@ public abstract class KeyboardInputMixin extends Input {
             this.forwardImpulse = beat$restoreImpulse(this.forwardImpulse, slowDownFactor);
         }
 
-        if (!(minecraft.screen instanceof PhoneScreen phoneScreen) || !phoneScreen.isCameraMoveModeActive()) {
+        if (!(minecraft.screen instanceof PhoneScreen phoneScreen) || !phoneScreen.allowsWorldMovement()) {
             return;
         }
 
@@ -43,12 +43,13 @@ public abstract class KeyboardInputMixin extends Input {
         boolean down = isKeyDown(windowHandle, this.options.keyDown);
         boolean left = isKeyDown(windowHandle, this.options.keyLeft);
         boolean right = isKeyDown(windowHandle, this.options.keyRight);
+        boolean allowJump = !phoneScreen.isPhotoCameraMode() || phoneScreen.isCameraMoveModeActive();
 
         this.up = up;
         this.down = down;
         this.left = left;
         this.right = right;
-        this.jumping = isKeyDown(windowHandle, this.options.keyJump);
+        this.jumping = allowJump && isKeyDown(windowHandle, this.options.keyJump);
         this.shiftKeyDown = isKeyDown(windowHandle, this.options.keyShift);
         this.forwardImpulse = calculateImpulse(up, down);
         this.leftImpulse = calculateImpulse(left, right);
