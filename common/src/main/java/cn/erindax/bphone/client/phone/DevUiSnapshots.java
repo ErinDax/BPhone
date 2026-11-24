@@ -283,10 +283,11 @@ public final class DevUiSnapshots {
 
     private static void injectPublic(Minecraft minecraft) {
         PhonePublicChat.clear();
+        String selfName = minecraft.player.getGameProfile().getName();
         minecraft.gui.getChat().addMessage(Component.translatable("multiplayer.player.joined", "Mika"));
         PhonePublicChat.addPlayer(MIKA, "Mika", "hi everyone, anyone near the central station?");
         PhonePublicChat.addPlayer(JIE, "阿杰", "我在，刚从便利店出来");
-        PhonePublicChat.addPlayer(JIE, "阿杰", "周六的钓鱼还去吗");
+        PhonePublicChat.addPlayer(JIE, "阿杰", "「Mika: anyone near the central station?」 周六的钓鱼还去吗 @" + selfName);
         minecraft.gui.getChat().addMessage(Component.translatable("chat.type.text", "小樱",
                 "去呀，我已经把鱼饵买好了，到时候中央车站门口集合"));
         minecraft.gui.getChat().addMessage(Component.literal("<路人甲> 这条不是在线玩家发的"));
@@ -382,6 +383,13 @@ public final class DevUiSnapshots {
             screen.chat.openPublic(false);
             screen.chat.publicDraft = "大家晚上好";
         });
+        scene("17c_public_reply_emoji", screen -> {
+            call(screen, "openChatApp", PhoneChatLayout.TAB_CHATS);
+            screen.chat.openPublic(false);
+            screen.chat.setPublicReply("小樱", "去呀，我已经把鱼饵买好了");
+            screen.chat.publicDraft = "太棒了 ";
+            screen.chat.publicEmojiOpen = true;
+        });
         scene("18_chat_dark", screen -> {
             screen.applyPhoneSetting(PhoneSettingsData.KEY_DARK_MODE, "1");
             call(screen, "openChatApp", PhoneChatLayout.TAB_CHATS);
@@ -443,7 +451,23 @@ public final class DevUiSnapshots {
         });
         world("29b_hud_nav", minecraft -> {
             minecraft.setScreen(null);
-            MapNavigation.start(new MapNavigation.Target("滨河站", "minecraft:overworld", spawnX + 100.5D, 64, spawnZ + 82.5D));
+            MapData.Marker shop = marker("m_shop");
+            double tx = shop != null ? shop.x() + 0.5D : spawnX + 20.5D;
+            double ty = shop != null ? shop.y() : minecraft.player.getY();
+            double tz = shop != null ? shop.z() + 0.5D : spawnZ + 14.5D;
+            MapNavigation.start(new MapNavigation.Target("便利店", "minecraft:overworld", tx, ty, tz));
+            minecraft.player.setYRot(-72.0F);
+            minecraft.player.setXRot(22.0F);
+        });
+        world("29c_nav_phone_open", minecraft -> {
+            PhoneScreen screen = new PhoneScreen(InteractionHand.MAIN_HAND);
+            minecraft.setScreen(screen);
+            screen.openMapApp();
+            MapData.Marker shop = marker("m_shop");
+            if (shop != null) {
+                screen.map.selectMarker(shop);
+                screen.map.navigateToSelection();
+            }
         });
         scene("30_shop", screen -> {
             MapNavigation.stop();
@@ -602,9 +626,10 @@ public final class DevUiSnapshots {
                 screen.chat.publicDraft = "/time set day";
             }
         });
-        world("92_vanilla_hud", minecraft -> {
+        world("92_modern_hud", minecraft -> {
             minecraft.setScreen(null);
-            minecraft.gui.getChat().addMessage(Component.literal("vanilla chat hud is back when the sidebar is closed"));
+            injectPublic(minecraft);
+            PhonePublicChat.addPlayer(SAKURA, "小樱", "「阿杰: 周六的钓鱼还去吗」 我带水果和饮料 (^_^)b");
         });
         world("93_command_key", minecraft -> {
             minecraft.setScreen(null);
