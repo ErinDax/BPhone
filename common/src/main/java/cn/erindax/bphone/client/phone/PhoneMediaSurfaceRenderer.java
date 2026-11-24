@@ -36,7 +36,7 @@ final class PhoneMediaSurfaceRenderer {
         int headerTop = contentTop + headerInset;
         int headerRight = displayRight;
 
-        guiGraphics.fill(displayLeft, displayTop, displayRight, displayBottom, 0xFFFFFFFF);
+        guiGraphics.fill(displayLeft, displayTop, displayRight, displayBottom, PhoneUi.PAGE);
 
         Component titleText = Component.translatable("screen.bphone.phone.gallery.title");
         int titleX = headerLeft + headerPadding;
@@ -64,11 +64,12 @@ final class PhoneMediaSurfaceRenderer {
         int headerBandBottom = Math.min(headerBottom,
                 hintY + PhoneScreenDraw.scaledTextHeight(minecraft.font, hintScale) + Math.max(6, Math.round(8 * screen.scale)));
 
-        guiGraphics.fill(headerLeft, displayTop, headerRight, headerBandBottom, 0xFF6C92F4);
+        guiGraphics.fill(headerLeft, displayTop, headerRight, headerBandBottom, PhoneUi.SURFACE);
+        guiGraphics.fill(headerLeft, headerBandBottom - 1, headerRight, headerBandBottom, PhoneUi.HAIRLINE);
 
-        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, titleText, titleX, titleY, 0xFFFFFFFF, false, titleScale);
-        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, pageText, pageChipX, pageChipY, 0xFFF2F6FF, false, pageScale);
-        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, hintText, titleX, hintY, 0xFFE8EEFF, false, hintScale);
+        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, titleText, titleX, titleY, PhoneUi.TEXT, false, titleScale);
+        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, pageText, pageChipX, pageChipY, PhoneUi.ACCENT, false, pageScale);
+        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, hintText, titleX, hintY, PhoneUi.TEXT_SECONDARY, false, hintScale);
 
         if (photos.isEmpty()) {
             Component emptyText = Component.translatable("screen.bphone.phone.gallery.empty");
@@ -81,32 +82,33 @@ final class PhoneMediaSurfaceRenderer {
             int emptyX = contentLeft + (contentRight - contentLeft - emptyWidth) / 2;
             int emptyY = headerBandBottom + (availableEmptyHeight - emptyHeight) / 2 - Math.round(10 * screen.scale);
 
-            PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, emptyText, emptyX, emptyY, 0xFFAAAAAA, false, emptyScale);
+            PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, emptyText, emptyX, emptyY, PhoneUi.TEXT_TERTIARY, false, emptyScale);
             return;
         }
 
         int pageStart = screen.galleryPage * PhoneScreen.GALLERY_PAGE_SIZE;
         int pageEnd = Math.min(pageStart + PhoneScreen.GALLERY_PAGE_SIZE, photos.size());
         int pageItemCount = pageEnd - pageStart;
+        int slotRadius = Math.max(2, Math.round(4 * screen.scale));
 
         for (int photoIndex = pageStart; photoIndex < pageEnd; photoIndex++) {
             int localIndex = photoIndex - pageStart;
             UiRect slotBounds = screen.getGallerySlotBounds(localIndex, pageItemCount);
             int cardX = slotBounds.left;
             int cardY = slotBounds.top;
-            int cardRight = slotBounds.right();
-            int cardBottom = slotBounds.bottom();
 
-            guiGraphics.fill(cardX, cardY, cardRight, cardBottom, 0xFFE5E5EA);
+            PhoneUi.fillRounded(guiGraphics, cardX, cardY, slotBounds.width, slotBounds.height, slotRadius, PhoneUi.SURFACE);
 
             PhotoEntry photoEntry = photos.get(photoIndex);
             boolean renderedImage = false;
             if (photoEntry.hasFile()) {
                 PhotoTexture photoTexture = screen.getOrLoadPhotoTexture(photoEntry.fileName, true);
                 if (photoTexture != null) {
-                    guiGraphics.blit(photoTexture.textureId, cardX, cardY, slotBounds.width, slotBounds.height,
-                            0.0F, 0.0F, photoTexture.width, photoTexture.height,
-                            photoTexture.width, photoTexture.height);
+                    PhoneScreenDraw.drawTextureInArea(guiGraphics, photoTexture.textureId, photoTexture.width, photoTexture.height,
+                            cardX, cardY, slotBounds.width, slotBounds.height, 1.0F);
+                    if (PhoneUi.hovered(screen, slotBounds)) {
+                        PhoneUi.strokeRounded(guiGraphics, cardX, cardY, slotBounds.width, slotBounds.height, slotRadius, 2, PhoneUi.ACCENT);
+                    }
                     renderedImage = true;
                 }
             }
@@ -149,8 +151,8 @@ final class PhoneMediaSurfaceRenderer {
         int contentBottom = contentBounds.bottom();
         int headerBottom = viewerLayout.areaY;
 
-        guiGraphics.fill(displayLeft, displayTop, displayRight, displayBottom, 0xFFFFFFFF);
-        guiGraphics.fill(contentLeft, contentTop, contentRight, headerBottom, 0xFFFFFFFF);
+        guiGraphics.fill(displayLeft, displayTop, displayRight, displayBottom, PhoneUi.PAGE);
+        guiGraphics.fill(contentLeft, contentTop, contentRight, headerBottom, PhoneUi.PAGE);
 
         int deleteButtonSize = Math.round(24 * screen.scale);
         int deleteButtonX = contentBounds.right() - deleteButtonSize - Math.round(6 * screen.scale);
@@ -160,10 +162,10 @@ final class PhoneMediaSurfaceRenderer {
         float titleScale = PhoneScreenDraw.textScaleToFit(minecraft.font, pageText, maxTitleWidth, 0.6F);
         titleScale = Math.min(titleScale, 1.25F);
 
-        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, pageText, titleX, titleY, 0xFF000000, false, titleScale);
+        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, pageText, titleX, titleY, PhoneUi.TEXT, false, titleScale);
 
-        guiGraphics.fill(viewerLayout.areaX, viewerLayout.areaY,
-                viewerLayout.areaX + viewerLayout.areaWidth, viewerLayout.areaY + viewerLayout.areaHeight, 0xFFE5E5EA);
+        PhoneUi.fillRounded(guiGraphics, viewerLayout.areaX, viewerLayout.areaY,
+                viewerLayout.areaWidth, viewerLayout.areaHeight, Math.max(3, Math.round(5 * screen.scale)), PhoneUi.SURFACE);
 
         boolean renderedImage = false;
         if (photoEntry.hasFile()) {

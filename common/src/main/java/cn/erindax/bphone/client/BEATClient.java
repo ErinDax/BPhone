@@ -20,6 +20,7 @@ import cn.erindax.bphone.client.notification.NotificationNetworkingClient;
 import cn.erindax.bphone.client.phone.ChatNetworkingClient;
 import cn.erindax.bphone.client.phone.PhoneClientHooks;
 import cn.erindax.bphone.client.phone.PhoneClientCallState;
+import cn.erindax.bphone.client.phone.PhoneFont;
 import cn.erindax.bphone.client.phone.PhoneNetworkingClient;
 import cn.erindax.bphone.client.phone.PhonePublicChat;
 import cn.erindax.bphone.client.phone.ShopNetworkingClient;
@@ -117,6 +118,7 @@ public final class BEATClient {
             MapTerrainCache.reset();
             PhoneClientHooks.clearMobileCallHotbarLock();
             PhoneClientHooks.clearBankReceiveWorldState(false);
+            PhoneFont.shutdown();
             shutdownMegaphoneVoice();
             shutdownPhoneCallVoice();
         });

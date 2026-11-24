@@ -1,19 +1,27 @@
 package cn.erindax.bphone.client.phone;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
+import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 import java.util.List;
 
-final class PhoneUi {
+public final class PhoneUi {
     private static final int[] LIGHT = {
             0xFFF2F3F5, 0xFFFFFFFF, 0xFFE5E6EB, 0xFFF5F6F8, 0xFF1F2329, 0xFF646A73, 0xFF8F959E, 0xFF1296DB,
             0xFF0F80BC, 0xFFE1F1FB, 0xFFA9D6F1, 0xFFF54A45, 0xFFDB3934, 0xFF06C755, 0xFFF0F1F3, 0xFFE3E5E8,
@@ -119,13 +127,16 @@ final class PhoneUi {
             fillRounded(guiGraphics, bounds.left + inset, bounds.top + inset, bounds.width - 2 * inset,
                     bounds.height - 2 * inset - 1, layout.radius, SECONDARY);
         }
-        int arm = Math.max(2, layout.titleHeight / 2);
-        int tipX = bounds.left + (bounds.width - arm - 2) / 2;
-        int centerY = bounds.top + (bounds.height - 1) / 2;
-        for (int step = 0; step <= arm; step++) {
-            guiGraphics.fill(tipX + step, centerY - step, tipX + step + 2, centerY - step + 1, ACCENT);
-            guiGraphics.fill(tipX + step, centerY + step, tipX + step + 2, centerY + step + 1, ACCENT);
-        }
+        int density = pixelDensity();
+        float arm = Math.max(2.5F, layout.titleHeight * 0.48F) * density;
+        float stroke = Math.max(1.4F, density * 0.85F);
+        float tipX = (bounds.left + bounds.width * 0.5F) * density - arm * 0.45F;
+        float centerY = (bounds.top + (bounds.height - 1) * 0.5F) * density;
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        drawSmoothSegment(guiGraphics, tipX + arm, centerY - arm, tipX, centerY, stroke, ACCENT);
+        drawSmoothSegment(guiGraphics, tipX, centerY, tipX + arm, centerY + arm, stroke, ACCENT);
+        guiGraphics.pose().popPose();
     }
 
     static void renderPlus(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect bounds) {
@@ -134,11 +145,16 @@ final class PhoneUi {
             fillRounded(guiGraphics, bounds.left + inset, bounds.top + inset, bounds.width - 2 * inset,
                     bounds.height - 2 * inset - 1, layout.radius, SECONDARY);
         }
-        int arm = Math.max(2, layout.titleHeight / 2);
-        int centerX = bounds.left + bounds.width / 2;
-        int centerY = bounds.top + (bounds.height - 1) / 2;
-        guiGraphics.fill(centerX - arm, centerY, centerX + arm + 1, centerY + 1, ACCENT);
-        guiGraphics.fill(centerX, centerY - arm, centerX + 1, centerY + arm + 1, ACCENT);
+        int density = pixelDensity();
+        int arm = Math.max(2, layout.titleHeight / 2) * density;
+        int halfStroke = Math.max(1, Math.round(density * 0.65F));
+        int centerX = (bounds.left + bounds.width / 2) * density;
+        int centerY = (bounds.top + (bounds.height - 1) / 2) * density;
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        guiGraphics.fill(centerX - arm, centerY - halfStroke, centerX + arm + 1, centerY + halfStroke, ACCENT);
+        guiGraphics.fill(centerX - halfStroke, centerY - arm, centerX + halfStroke, centerY + arm + 1, ACCENT);
+        guiGraphics.pose().popPose();
     }
 
     static int renderIconHover(PhoneScreen screen, GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect bounds,
@@ -340,13 +356,16 @@ final class PhoneUi {
     }
 
     static void renderChevron(GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect row) {
-        int arm = layout.chevronArm();
-        int left = row.right() - layout.pad - arm - 1;
-        int centerY = row.top + row.height / 2;
-        for (int step = 0; step <= arm; step++) {
-            guiGraphics.fill(left + step, centerY - arm + step, left + step + 1, centerY - arm + step + 1, TEXT_TERTIARY);
-            guiGraphics.fill(left + step, centerY + arm - step, left + step + 1, centerY + arm - step + 1, TEXT_TERTIARY);
-        }
+        int density = pixelDensity();
+        float arm = Math.max(2.0F, layout.chevronArm()) * density;
+        float stroke = Math.max(1.25F, density * 0.75F);
+        float right = (row.right() - layout.pad - 1) * density;
+        float centerY = (row.top + row.height * 0.5F) * density;
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        drawSmoothSegment(guiGraphics, right - arm, centerY - arm, right, centerY, stroke, TEXT_TERTIARY);
+        drawSmoothSegment(guiGraphics, right, centerY, right - arm, centerY + arm, stroke, TEXT_TERTIARY);
+        guiGraphics.pose().popPose();
     }
 
     static void renderTwoLineText(GuiGraphics guiGraphics, PhoneChatLayout layout, UiRect row, int left, int right,
@@ -488,20 +507,91 @@ final class PhoneUi {
     }
 
     static void renderFace(GuiGraphics guiGraphics, ResourceLocation texture, UiRect bounds, int background) {
-        PlayerFaceRenderer.draw(guiGraphics, texture, bounds.left, bounds.top, bounds.width);
-        if (bounds.width < 12) {
+        int radius = Math.max(2, bounds.width / 5);
+        renderRoundedFace(guiGraphics, texture, bounds.left, bounds.top, bounds.width, radius, 1.0F);
+    }
+
+    public static void renderRoundedFace(GuiGraphics guiGraphics, ResourceLocation texture, int x, int y, int size,
+                                         int radius, float alphaFactor) {
+        if (size <= 0 || texture == null) {
             return;
         }
-        int radius = bounds.width >= 28 ? 2 : 1;
-        for (int row = 0; row < radius; row++) {
-            int inset = cornerInset(radius, row);
-            int top = bounds.top + row;
-            int bottom = bounds.bottom() - 1 - row;
-            guiGraphics.fill(bounds.left, top, bounds.left + inset, top + 1, background);
-            guiGraphics.fill(bounds.right() - inset, top, bounds.right(), top + 1, background);
-            guiGraphics.fill(bounds.left, bottom, bounds.left + inset, bottom + 1, background);
-            guiGraphics.fill(bounds.right() - inset, bottom, bounds.right(), bottom + 1, background);
+        guiGraphics.flush();
+        int density = pixelDensity();
+        int left = x * density;
+        int top = y * density;
+        int right = (x + size) * density;
+        int bottom = (y + size) * density;
+        int corner = Math.max(0, Math.min(radius, size / 2)) * density;
+        int baseAlpha = Mth.clamp(Math.round(alphaFactor * 255.0F), 0, 255);
+        if (baseAlpha <= 0) {
+            return;
         }
+
+        boolean blendEnabled = GL11.glIsEnabled(GL11.GL_BLEND);
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        Matrix4f matrix = guiGraphics.pose().last().pose();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
+        RenderSystem.setShaderTexture(0, texture);
+        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        emitRoundedSkinLayer(builder, matrix, left, top, right, bottom, corner, 8.0F / 64.0F, 16.0F / 64.0F, 8.0F / 64.0F, 16.0F / 64.0F, baseAlpha);
+        emitRoundedSkinLayer(builder, matrix, left, top, right, bottom, corner, 40.0F / 64.0F, 48.0F / 64.0F, 8.0F / 64.0F, 16.0F / 64.0F, baseAlpha);
+        BufferUploader.drawWithShader(builder.buildOrThrow());
+        if (!blendEnabled) {
+            RenderSystem.disableBlend();
+        }
+        guiGraphics.pose().popPose();
+    }
+
+    private static void emitRoundedSkinLayer(BufferBuilder builder, Matrix4f matrix, int left, int top, int right, int bottom,
+                                             int corner, float uMin, float uMax, float vMin, float vMax, int baseAlpha) {
+        float width = Math.max(1, right - left);
+        float height = Math.max(1, bottom - top);
+        if (bottom - corner > top + corner) {
+            addSkinQuad(builder, matrix, left, top + corner, right, bottom - corner, left, top, width, height, uMin, uMax, vMin, vMax, baseAlpha);
+        }
+        for (int row = 0; row < corner; row++) {
+            double dy = corner - 0.5D - row;
+            int innerInset = corner - (int) Math.floor(Math.sqrt(Math.max(0.0D, (corner - 0.65D) * (corner - 0.65D) - dy * dy)));
+            int outerInset = Math.max(0, corner - (int) Math.ceil(Math.sqrt(Math.max(0.0D, (corner + 0.65D) * (corner + 0.65D) - dy * dy))) - 1);
+            if (right - innerInset > left + innerInset) {
+                addSkinQuad(builder, matrix, left + innerInset, top + row, right - innerInset, top + row + 1, left, top, width, height, uMin, uMax, vMin, vMax, baseAlpha);
+                addSkinQuad(builder, matrix, left + innerInset, bottom - 1 - row, right - innerInset, bottom - row, left, top, width, height, uMin, uMax, vMin, vMax, baseAlpha);
+            }
+            int limit = Math.min(corner, innerInset);
+            for (int col = outerInset; col < limit; col++) {
+                double dx = corner - 0.5D - col;
+                float cov = Mth.clamp((float) (corner + 0.5D - Math.hypot(dx, dy)), 0.0F, 1.0F);
+                int a = Math.round(baseAlpha * cov);
+                if (a <= 0) {
+                    continue;
+                }
+                addSkinQuad(builder, matrix, left + col, top + row, left + col + 1, top + row + 1, left, top, width, height, uMin, uMax, vMin, vMax, a);
+                if (right - 1 - col != left + col) {
+                    addSkinQuad(builder, matrix, right - 1 - col, top + row, right - col, top + row + 1, left, top, width, height, uMin, uMax, vMin, vMax, a);
+                }
+                addSkinQuad(builder, matrix, left + col, bottom - 1 - row, left + col + 1, bottom - row, left, top, width, height, uMin, uMax, vMin, vMax, a);
+                if (right - 1 - col != left + col) {
+                    addSkinQuad(builder, matrix, right - 1 - col, bottom - 1 - row, right - col, bottom - row, left, top, width, height, uMin, uMax, vMin, vMax, a);
+                }
+            }
+        }
+    }
+
+    private static void addSkinQuad(BufferBuilder builder, Matrix4f matrix, int qLeft, int qTop, int qRight, int qBottom,
+                                    int baseLeft, int baseTop, float fullW, float fullH,
+                                    float uMin, float uMax, float vMin, float vMax, int alpha) {
+        float u0 = uMin + (qLeft - baseLeft) / fullW * (uMax - uMin);
+        float u1 = uMin + (qRight - baseLeft) / fullW * (uMax - uMin);
+        float v0 = vMin + (qTop - baseTop) / fullH * (vMax - vMin);
+        float v1 = vMin + (qBottom - baseTop) / fullH * (vMax - vMin);
+        builder.addVertex(matrix, qLeft, qTop, 0.0F).setUv(u0, v0).setColor(255, 255, 255, alpha);
+        builder.addVertex(matrix, qLeft, qBottom, 0.0F).setUv(u0, v1).setColor(255, 255, 255, alpha);
+        builder.addVertex(matrix, qRight, qBottom, 0.0F).setUv(u1, v1).setColor(255, 255, 255, alpha);
+        builder.addVertex(matrix, qRight, qTop, 0.0F).setUv(u1, v0).setColor(255, 255, 255, alpha);
     }
 
     static void renderItem(GuiGraphics guiGraphics, ItemStack stack, UiRect bounds) {
@@ -556,8 +646,12 @@ final class PhoneUi {
         guiGraphics.pose().popPose();
     }
 
-    static void fillRounded(GuiGraphics guiGraphics, int x, int y, int width, int height, int radius, int color) {
+    public static void fillRounded(GuiGraphics guiGraphics, int x, int y, int width, int height, int radius, int color) {
         if (width <= 0 || height <= 0) {
+            return;
+        }
+        int baseAlpha = (color >>> 24) & 0xFF;
+        if (baseAlpha == 0) {
             return;
         }
         int r = Math.min(radius, Math.min(width, height) / 2);
@@ -565,6 +659,7 @@ final class PhoneUi {
             guiGraphics.fill(x, y, x + width, y + height, color);
             return;
         }
+        int rgb = color & 0x00FFFFFF;
         int density = pixelDensity();
         int left = x * density;
         int top = y * density;
@@ -574,22 +669,132 @@ final class PhoneUi {
         guiGraphics.pose().pushPose();
         guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
         guiGraphics.drawManaged(() -> {
-            guiGraphics.fill(left, top + pr, right, bottom - pr, color);
+            if (bottom - pr > top + pr) {
+                guiGraphics.fill(left, top + pr, right, bottom - pr, color);
+            }
             for (int row = 0; row < pr; row++) {
-                int inset = roundInset(pr, row);
-                guiGraphics.fill(left + inset, top + row, right - inset, top + row + 1, color);
-                guiGraphics.fill(left + inset, bottom - 1 - row, right - inset, bottom - row, color);
+                double dy = pr - 0.5D - row;
+                int innerInset = pr - (int) Math.floor(Math.sqrt(Math.max(0.0D, (pr - 0.65D) * (pr - 0.65D) - dy * dy)));
+                int outerInset = Math.max(0, pr - (int) Math.ceil(Math.sqrt(Math.max(0.0D, (pr + 0.65D) * (pr + 0.65D) - dy * dy))) - 1);
+                if (right - innerInset > left + innerInset) {
+                    guiGraphics.fill(left + innerInset, top + row, right - innerInset, top + row + 1, color);
+                    if (bottom - 1 - row != top + row) {
+                        guiGraphics.fill(left + innerInset, bottom - 1 - row, right - innerInset, bottom - row, color);
+                    }
+                }
+                int limit = Math.min(pr, innerInset);
+                for (int col = outerInset; col < limit; col++) {
+                    double dx = pr - 0.5D - col;
+                    float cov = Mth.clamp((float) (pr + 0.5D - Math.hypot(dx, dy)), 0.0F, 1.0F);
+                    int a = Math.round(baseAlpha * cov);
+                    if (a <= 0) {
+                        continue;
+                    }
+                    int edgeColor = (a << 24) | rgb;
+                    guiGraphics.fill(left + col, top + row, left + col + 1, top + row + 1, edgeColor);
+                    if (right - 1 - col != left + col) {
+                        guiGraphics.fill(right - 1 - col, top + row, right - col, top + row + 1, edgeColor);
+                    }
+                    if (bottom - 1 - row != top + row) {
+                        guiGraphics.fill(left + col, bottom - 1 - row, left + col + 1, bottom - row, edgeColor);
+                        if (right - 1 - col != left + col) {
+                            guiGraphics.fill(right - 1 - col, bottom - 1 - row, right - col, bottom - row, edgeColor);
+                        }
+                    }
+                }
             }
         });
         guiGraphics.pose().popPose();
     }
 
-    static int roundInset(int radius, int row) {
-        double offset = radius - row - 0.5;
-        return radius - (int) Math.round(Math.sqrt(Math.max(0.0, (double) radius * radius - offset * offset)));
+    public static void strokeRounded(GuiGraphics guiGraphics, int x, int y, int width, int height, int radius,
+                                     int strokePhysPx, int color) {
+        int baseAlpha = (color >>> 24) & 0xFF;
+        if (width <= 0 || height <= 0 || strokePhysPx <= 0 || baseAlpha == 0) {
+            return;
+        }
+        int rgb = color & 0x00FFFFFF;
+        int density = pixelDensity();
+        int left = x * density;
+        int top = y * density;
+        int right = (x + width) * density;
+        int bottom = (y + height) * density;
+        int pr = Math.min(radius, Math.min(width, height) / 2) * density;
+        int t = strokePhysPx;
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(1.0F / density, 1.0F / density, 1.0F);
+        guiGraphics.drawManaged(() -> {
+            if (right - pr > left + pr) {
+                guiGraphics.fill(left + pr, top, right - pr, top + t, color);
+                guiGraphics.fill(left + pr, bottom - t, right - pr, bottom, color);
+            }
+            if (bottom - pr > top + pr) {
+                guiGraphics.fill(left, top + pr, left + t, bottom - pr, color);
+                guiGraphics.fill(right - t, top + pr, right, bottom - pr, color);
+            }
+            double innerR = Math.max(0.0D, pr - t);
+            for (int row = 0; row < pr; row++) {
+                double dy = pr - 0.5D - row;
+                for (int col = 0; col < pr; col++) {
+                    double dx = pr - 0.5D - col;
+                    double dist = Math.hypot(dx, dy);
+                    if (dist > pr + 0.6D || dist < innerR - 0.6D) {
+                        continue;
+                    }
+                    float outerCov = Mth.clamp((float) (pr + 0.5D - dist), 0.0F, 1.0F);
+                    float innerCov = innerR <= 0.0D ? 1.0F : Mth.clamp((float) (dist - (innerR - 0.5D)), 0.0F, 1.0F);
+                    int a = Math.round(baseAlpha * outerCov * innerCov);
+                    if (a <= 0) {
+                        continue;
+                    }
+                    int edgeColor = (a << 24) | rgb;
+                    guiGraphics.fill(left + col, top + row, left + col + 1, top + row + 1, edgeColor);
+                    if (right - 1 - col != left + col) {
+                        guiGraphics.fill(right - 1 - col, top + row, right - col, top + row + 1, edgeColor);
+                    }
+                    if (bottom - 1 - row != top + row) {
+                        guiGraphics.fill(left + col, bottom - 1 - row, left + col + 1, bottom - row, edgeColor);
+                        if (right - 1 - col != left + col) {
+                            guiGraphics.fill(right - 1 - col, bottom - 1 - row, right - col, bottom - row, edgeColor);
+                        }
+                    }
+                }
+            }
+        });
+        guiGraphics.pose().popPose();
     }
 
-    static int pixelDensity() {
+    static void drawSmoothSegment(GuiGraphics guiGraphics, float x0, float y0, float x1, float y1, float thickness, int color) {
+        float dx = x1 - x0;
+        float dy = y1 - y0;
+        float length = (float) Math.hypot(dx, dy);
+        if (length < 0.001F) {
+            return;
+        }
+        int baseAlpha = (color >>> 24) & 0xFF;
+        int rgb = color & 0x00FFFFFF;
+        float half = thickness * 0.5F;
+        int minX = Mth.floor(Math.min(x0, x1) - half - 1.0F);
+        int maxX = Mth.ceil(Math.max(x0, x1) + half + 1.0F);
+        int minY = Mth.floor(Math.min(y0, y1) - half - 1.0F);
+        int maxY = Mth.ceil(Math.max(y0, y1) + half + 1.0F);
+        float lenSq = length * length;
+        for (int py = minY; py <= maxY; py++) {
+            for (int px = minX; px <= maxX; px++) {
+                float cx = px + 0.5F;
+                float cy = py + 0.5F;
+                float t = Mth.clamp(((cx - x0) * dx + (cy - y0) * dy) / lenSq, 0.0F, 1.0F);
+                float dist = (float) Math.hypot(cx - (x0 + t * dx), cy - (y0 + t * dy));
+                float cov = Mth.clamp(half + 0.5F - dist, 0.0F, 1.0F);
+                int a = Math.round(baseAlpha * cov);
+                if (a > 0) {
+                    guiGraphics.fill(px, py, px + 1, py + 1, (a << 24) | rgb);
+                }
+            }
+        }
+    }
+
+    public static int pixelDensity() {
         return Math.max(1, (int) Math.round(Minecraft.getInstance().getWindow().getGuiScale()));
     }
 

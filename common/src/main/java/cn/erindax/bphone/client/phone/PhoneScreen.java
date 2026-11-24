@@ -1346,12 +1346,12 @@ public final class PhoneScreen extends Screen {
     }
 
     private void addLockWidgets() {
-        int scaledIconSize = Math.round(ICON_SIZE * scale);
-        int x = displayX + (displayWidth - scaledIconSize) / 2;
-        int y = displayY + displayHeight - scaledIconSize - Math.round(44 * scale);
+        int buttonSize = Math.max(24, Math.round(32 * scale));
+        int x = displayX + (displayWidth - buttonSize) / 2;
+        int y = displayY + displayHeight - buttonSize - Math.round(38 * scale);
 
         addRenderableWidget(new ImageButton(
-                x, y, scaledIconSize, scaledIconSize,
+                x, y, buttonSize, buttonSize,
                 0, 0, 0, UNLOCK_TEXTURE, UNLOCK_TEXTURE_SIZE, UNLOCK_TEXTURE_SIZE,
                 button -> {
                     unlocked = true;
@@ -1359,11 +1359,23 @@ public final class PhoneScreen extends Screen {
                 }) {
             @Override
             public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-                guiGraphics.blit(this.resourceLocation, this.getX(), this.getY(), this.width, this.height, 0.0F, 0.0F,
-                        UNLOCK_TEXTURE_SIZE, UNLOCK_TEXTURE_SIZE, UNLOCK_TEXTURE_SIZE, UNLOCK_TEXTURE_SIZE);
+                int r = this.width / 2;
+                int bg = this.isHovered() ? 0x991C1F26 : 0x7214161B;
+                PhoneUi.fillRounded(guiGraphics, this.getX(), this.getY(), this.width, this.height, r, bg);
+                PhoneUi.strokeRounded(guiGraphics, this.getX(), this.getY(), this.width, this.height, r, 1, 0x55FFFFFF);
+                int bodyW = Math.max(8, Math.round(this.width * 0.42F));
+                int bodyH = Math.max(6, Math.round(this.height * 0.34F));
+                int bodyX = this.getX() + (this.width - bodyW) / 2;
+                int bodyY = this.getY() + Math.round(this.height * 0.46F);
+                int shackleW = Math.max(6, Math.round(bodyW * 0.72F));
+                int shackleH = Math.max(5, Math.round(bodyH * 0.85F));
+                int shackleX = this.getX() + (this.width - shackleW) / 2;
+                int shackleY = bodyY - shackleH + 2;
+                PhoneUi.strokeRounded(guiGraphics, shackleX, shackleY, shackleW, shackleH + 2, shackleW / 2,
+                        Math.max(1, PhoneUi.pixelDensity()), 0xF2FFFFFF);
+                PhoneUi.fillRounded(guiGraphics, bodyX, bodyY, bodyW, bodyH, Math.max(2, bodyW / 4), 0xF2FFFFFF);
             }
         });
-
     }
 
     private void addHomeWidgets() {
@@ -1454,7 +1466,7 @@ public final class PhoneScreen extends Screen {
                     return;
                 }
 
-                Font font = minecraft.font;
+                Font font = PhoneFont.get();
                 PhoneChatLayout layout = new PhoneChatLayout(PhoneScreen.this);
                 int paddingX = Math.max(2, Math.round(3 * scale));
                 int paddingY = Math.max(1, Math.round(2 * scale));
@@ -1659,28 +1671,59 @@ public final class PhoneScreen extends Screen {
         Component timeText = Component.literal(String.format("%02d:%02d", hours, minutes));
 
         if (!unlocked) {
-            float timeScale = Math.max(1.55F, scale * 1.95F);
+            float timeScale = Math.max(1.65F, scale * 2.15F);
             int textWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, timeText, timeScale);
             int textHeight = PhoneScreenDraw.scaledTextHeight(minecraft.font, timeScale);
             int textX = displayX + (displayWidth - textWidth) / 2;
-            int textY = displayY + Math.round(displayHeight * 0.24F) - (textHeight / 2);
+            int textY = displayY + Math.round(displayHeight * 0.21F) - (textHeight / 2);
 
-            PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, timeText, textX, textY, 0xFF404040, false, timeScale);
+            Component dayText = Component.translatable("screen.bphone.phone.home.day", dayTime / 24000L + 1);
+            float dayScale = new PhoneChatLayout(this).bodyScale;
+            int dayWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, dayText, dayScale);
+            int dayHeight = PhoneScreenDraw.scaledTextHeight(minecraft.font, dayScale);
+            int dayX = displayX + (displayWidth - dayWidth) / 2;
+            int dayY = textY + textHeight + Math.round(4 * scale);
+
+            int padX = Math.max(10, Math.round(14 * scale));
+            int padY = Math.max(6, Math.round(8 * scale));
+            int cardW = Math.max(textWidth, dayWidth) + 2 * padX;
+            int cardH = (dayY + dayHeight - textY) + 2 * padY;
+            int cardX = displayX + (displayWidth - cardW) / 2;
+            int cardY = textY - padY;
+            int cardR = Math.max(6, Math.round(10 * scale));
+            PhoneUi.fillRounded(guiGraphics, cardX, cardY, cardW, cardH, cardR, 0x5212151E);
+            PhoneUi.strokeRounded(guiGraphics, cardX, cardY, cardW, cardH, cardR, 1, 0x36FFFFFF);
+
+            PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, timeText, textX, textY, 0xFFFFFFFF, false, timeScale);
+            PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, dayText, dayX, dayY, 0xEBFFFFFF, false, dayScale);
             return;
         }
 
-        float timeScale = Math.max(1.2F, scale * 1.5F);
+        float timeScale = Math.max(1.3F, scale * 1.65F);
         int timeWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, timeText, timeScale);
         int timeHeight = PhoneScreenDraw.scaledTextHeight(minecraft.font, timeScale);
-        int timeY = displayY + Math.round(displayHeight * 0.12F);
-        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, timeText, displayX + (displayWidth - timeWidth) / 2,
-                timeY, 0xFF404040, false, timeScale);
+        int timeX = displayX + (displayWidth - timeWidth) / 2;
+        int timeY = displayY + Math.round(displayHeight * 0.10F);
 
         Component dayText = Component.translatable("screen.bphone.phone.home.day", dayTime / 24000L + 1);
         float dayScale = new PhoneChatLayout(this).bodyScale;
         int dayWidth = PhoneScreenDraw.scaledTextWidth(minecraft.font, dayText, dayScale);
-        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, dayText, displayX + (displayWidth - dayWidth) / 2,
-                timeY + timeHeight + Math.round(4 * scale), 0xFF505050, false, dayScale);
+        int dayHeight = PhoneScreenDraw.scaledTextHeight(minecraft.font, dayScale);
+        int dayX = displayX + (displayWidth - dayWidth) / 2;
+        int dayY = timeY + timeHeight + Math.round(3 * scale);
+
+        int padX = Math.max(8, Math.round(12 * scale));
+        int padY = Math.max(5, Math.round(6 * scale));
+        int cardW = Math.max(timeWidth, dayWidth) + 2 * padX;
+        int cardH = (dayY + dayHeight - timeY) + 2 * padY;
+        int cardX = displayX + (displayWidth - cardW) / 2;
+        int cardY = timeY - padY;
+        int cardR = Math.max(5, Math.round(8 * scale));
+        PhoneUi.fillRounded(guiGraphics, cardX, cardY, cardW, cardH, cardR, 0x4C12151E);
+        PhoneUi.strokeRounded(guiGraphics, cardX, cardY, cardW, cardH, cardR, 1, 0x30FFFFFF);
+
+        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, timeText, timeX, timeY, 0xFFFFFFFF, false, timeScale);
+        PhoneScreenDraw.drawScaledText(guiGraphics, minecraft.font, dayText, dayX, dayY, 0xEBFFFFFF, false, dayScale);
     }
 
     private void renderGallerySurface(GuiGraphics guiGraphics) {
@@ -2107,14 +2150,14 @@ public final class PhoneScreen extends Screen {
     }
 
     int panelRadius() {
-        return Math.max(2, Math.round(8 * scale));
+        return Math.max(4, Math.round(10 * scale));
     }
 
     UiRect getCameraControlBandBounds() {
         return getLayoutState().cameraControlBandBounds();
     }
 
-    boolean isPhotoCameraMode() {
+    public boolean isPhotoCameraMode() {
         return cameraMode && !isBankScanCameraMode() && !isChatScanCameraMode();
     }
 

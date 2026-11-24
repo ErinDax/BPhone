@@ -170,8 +170,20 @@ public final class MapDraw {
             graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotation(angle));
         }
         graphics.pose().scale(textScale, textScale, 1.0F);
-        font.drawInBatch8xOutline(text, 0.0F, 0.0F, color, outline, graphics.pose().last().pose(),
-                graphics.bufferSource(), LightTexture.FULL_BRIGHT);
+        Matrix4f textPose = graphics.pose().last().pose();
+        int halo = (outline & 0x00FFFFFF) | 0xCC000000;
+        float offset = 0.42F;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                if (dx != 0 || dy != 0) {
+                    font.drawInBatch(text, dx * offset, dy * offset, halo, false, textPose,
+                            graphics.bufferSource(), Font.DisplayMode.NORMAL, 0, LightTexture.FULL_BRIGHT);
+                }
+            }
+        }
+        graphics.flush();
+        font.drawInBatch(text, 0.0F, 0.0F, color, false, textPose,
+                graphics.bufferSource(), Font.DisplayMode.NORMAL, 0, LightTexture.FULL_BRIGHT);
         graphics.pose().popPose();
         graphics.flush();
     }

@@ -9,29 +9,38 @@ final class PhoneScreenDraw {
     private PhoneScreenDraw() {
     }
 
+    private static Font resolveFont(Font fallback) {
+        Font modern = PhoneFont.get();
+        return modern != null ? modern : fallback;
+    }
+
     static float textScaleToFit(Font font, Component text, int maxWidth) {
         return textScaleToFit(font, text, maxWidth, 0.45F);
     }
 
     static float textScaleToFit(Font font, Component text, int maxWidth, float minScale) {
-        int textWidth = Math.max(1, font.width(text));
+        Font active = resolveFont(font);
+        int textWidth = Math.max(1, active.width(text));
         return Math.min(1.0F, Math.max(minScale, (float) maxWidth / textWidth));
     }
 
     static int scaledTextWidth(Font font, Component text, float textScale) {
-        return Math.max(1, Math.round(font.width(text) * textScale));
+        Font active = resolveFont(font);
+        return Math.max(1, Math.round(active.width(text) * textScale));
     }
 
     static int scaledTextHeight(Font font, float textScale) {
-        return Math.max(1, Math.round(font.lineHeight * textScale));
+        Font active = resolveFont(font);
+        return Math.max(1, Math.round(active.lineHeight * textScale));
     }
 
     static void drawScaledText(GuiGraphics guiGraphics, Font font, Component text,
                                int x, int y, int color, boolean shadow, float textScale) {
+        Font active = resolveFont(font);
         guiGraphics.pose().pushPose();
         guiGraphics.pose().translate(x, y, 0.0F);
         guiGraphics.pose().scale(textScale, textScale, 1.0F);
-        guiGraphics.drawString(font, text, 0, 0, color, shadow);
+        guiGraphics.drawString(active, text, 0, 0, color, shadow);
         guiGraphics.pose().popPose();
     }
 

@@ -78,13 +78,13 @@ final class PhoneChatLayout {
 
     PhoneChatLayout(PhoneScreen screen) {
         Minecraft minecraft = Minecraft.getInstance();
-        this.font = minecraft.font;
+        this.font = PhoneFont.get();
         this.scale = screen.scale;
         this.guiScale = Math.max(1, (int) Math.round(minecraft.getWindow().getGuiScale()));
         this.surface = new UiRect(screen.displayX, screen.displayY, screen.displayWidth, screen.displayHeight);
-        this.titleScale = crisp(scale);
-        this.bodyScale = crisp(0.82F * scale);
-        this.captionScale = crisp(0.68F * scale);
+        this.titleScale = crisp(0.96F * scale);
+        this.bodyScale = crisp(0.80F * scale);
+        this.captionScale = crisp(0.66F * scale);
         this.titleHeight = glyphHeight(titleScale);
         this.bodyHeight = glyphHeight(bodyScale);
         this.captionHeight = glyphHeight(captionScale);
@@ -93,7 +93,7 @@ final class PhoneChatLayout {
         this.pad = u(6);
         this.gap = u(4);
         this.textGap = Math.max(1, u(3));
-        this.radius = Math.max(1, u(3));
+        this.radius = Math.max(2, u(4));
         this.headerHeight = Math.max(u(24), titleHeight + u(12));
         this.threadHeaderHeight = Math.max(headerHeight, titleHeight + textGap + captionHeight + u(10));
         this.tabBarHeight = Math.max(u(26), bodyHeight + u(14));
@@ -109,10 +109,10 @@ final class PhoneChatLayout {
         this.sectionHeight = captionHeight + u(10);
         this.hintHeight = captionHeight + u(16);
         this.sectionGap = u(6);
-        this.bubblePadX = u(5);
-        this.bubblePadY = Math.max(2, u(3));
+        this.bubblePadX = u(6);
+        this.bubblePadY = Math.max(2, u(4));
         this.bubbleGap = u(4);
-        this.bubbleRadius = Math.max(1, u(4));
+        this.bubbleRadius = Math.max(3, u(6));
         this.messagePad = u(6);
         this.scrollStep = Math.max(8, Math.round(rowHeight * 0.6F));
         this.barHeight = fieldHeight + 2 * u(5);
@@ -140,9 +140,8 @@ final class PhoneChatLayout {
     }
 
     private float crisp(float desired) {
-        float snapped = Math.round(desired * guiScale) / (float) guiScale;
-        float minimum = Math.min(1.0F, 2.0F / guiScale);
-        return Math.max(snapped, minimum);
+        float minimum = Math.min(0.85F, 2.2F / guiScale);
+        return Math.max(desired, minimum);
     }
 
     private static int glyphHeight(float textScale) {
