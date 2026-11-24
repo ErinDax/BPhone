@@ -1,8 +1,11 @@
 package cn.erindax.bphone.client.map;
 
+import cn.erindax.bphone.client.phone.PhoneFont;
 import cn.erindax.bphone.client.phone.PhoneScreen;
+import cn.erindax.bphone.client.phone.PhoneUi;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.player.LocalPlayer;
@@ -176,25 +179,36 @@ public final class MapNavigation {
     public static void renderHud(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        if (target == null || player == null || minecraft.options.hideGui || minecraft.screen instanceof PhoneScreen) {
+        if (target == null || player == null || minecraft.options.hideGui) {
             return;
         }
+        int areaLeft = 0;
+        int areaRight = graphics.guiWidth();
+        if (minecraft.screen instanceof PhoneScreen phoneScreen) {
+            if (phoneScreen.isPhotoCameraMode()) {
+                return;
+            }
+            int panelWidth = Math.round(graphics.guiWidth() * 0.34F);
+            areaLeft = panelWidth;
+        }
+        Font font = PhoneFont.get();
         String distance = isOtherDimension()
                 ? Component.translatable("map.bphone.nav.other_dimension").getString()
                 : formatDistance(remaining);
         Component label = Component.literal(target.name() + "  " + distance);
         FormattedCharSequence text = label.getVisualOrderText();
-        int textWidth = minecraft.font.width(text);
-        int arrowSize = 9;
-        int width = textWidth + arrowSize + 16;
-        int height = 15;
-        int left = (graphics.guiWidth() - width) / 2;
-        int top = 4;
-        graphics.fill(left + 1, top, left + width - 1, top + height, 0xC0181A1F);
-        graphics.fill(left, top + 1, left + width, top + height - 1, 0xC0181A1F);
+        int textWidth = font.width(text);
+        int arrowSize = 10;
+        int width = textWidth + arrowSize + 20;
+        int height = 18;
+        int left = areaLeft + Math.max(4, (areaRight - areaLeft - width) / 2);
+        int top = 6;
+        int radius = height / 2;
+        PhoneUi.fillRounded(graphics, left, top, width, height, radius, 0xCC161920);
+        PhoneUi.strokeRounded(graphics, left, top, width, height, radius, 1, 0x454FC3F7);
 
         MapDraw draw = new MapDraw(graphics);
-        float centerX = left + 6 + arrowSize / 2.0F;
+        float centerX = left + 7 + arrowSize / 2.0F;
         float centerY = top + height / 2.0F;
         if (!isOtherDimension() && route.size() > next) {
             double[] point = route.get(next);
@@ -203,12 +217,12 @@ public final class MapNavigation {
             float yaw = (float) Math.toRadians(player.getYRot());
             double forward = dx * -Math.sin(yaw) + dz * Math.cos(yaw);
             double right = dx * -Math.cos(yaw) + dz * -Math.sin(yaw);
-            arrow(draw, centerX, centerY, (float) Math.atan2(-forward, right), arrowSize / 2.0F, 0xFF4FC3F7);
+            arrow(draw, centerX, centerY, (float) Math.atan2(-forward, right), arrowSize / 2.0F, 0xFF5CE1FF);
         } else {
             draw.disc(centerX, centerY, 2.5F, 0xFFB0B4BA);
         }
         draw.flush();
-        graphics.drawString(minecraft.font, text, left + arrowSize + 10, top + 4, 0xFFFFFFFF, false);
+        graphics.drawString(font, text, left + arrowSize + 12, top + (height - font.lineHeight) / 2, 0xFFFFFFFF, false);
     }
 
     public static void arrow(MapDraw draw, float x, float y, float angle, float size, int argb) {

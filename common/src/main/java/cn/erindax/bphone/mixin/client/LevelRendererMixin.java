@@ -1,10 +1,12 @@
 package cn.erindax.bphone.mixin.client;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import cn.erindax.bphone.ModBlocks;
 import cn.erindax.bphone.block.HomePhoneBlock;
 import cn.erindax.bphone.client.airstrike.AirstrikeClientState;
+import cn.erindax.bphone.client.map.MapWorldRenderer;
 import cn.erindax.bphone.client.render.HomePhoneOutlineRenderer;
 import cn.erindax.bphone.client.render.AirstrikeTargetRenderer;
 import net.minecraft.client.DeltaTracker;
@@ -18,6 +20,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -50,14 +53,20 @@ public abstract class LevelRendererMixin {
                                                   LightTexture lightTexture, Matrix4f frustumMatrix,
                                                   Matrix4f projectionMatrix,
                                                   CallbackInfo ci) {
-        java.util.List<Vec3> renderPositions = AirstrikeClientState.getRenderPositions(Minecraft.getInstance());
-        if (renderPositions.isEmpty()) {
-            return;
-        }
-
-        PoseStack poseStack = new PoseStack();
-        for (Vec3 renderPosition : renderPositions) {
-            AirstrikeTargetRenderer.render(poseStack, camera, renderPosition.x, renderPosition.y, renderPosition.z);
+        Matrix4fStack modelView = RenderSystem.getModelViewStack();
+        modelView.pushMatrix();
+        modelView.mul(frustumMatrix);
+        RenderSystem.applyModelViewMatrix();
+        try {
+            PoseStack poseStack = new PoseStack();
+            MapWorldRenderer.renderWorld(poseStack, camera, deltaTracker.getGameTimeDeltaPartialTick(false));
+            java.util.List<Vec3> renderPositions = AirstrikeClientState.getRenderPositions(Minecraft.getInstance());
+            for (Vec3 renderPosition : renderPositions) {
+                AirstrikeTargetRenderer.render(poseStack, camera, renderPosition.x, renderPosition.y, renderPosition.z);
+            }
+        } finally {
+            modelView.popMatrix();
+            RenderSystem.applyModelViewMatrix();
         }
     }
 }
